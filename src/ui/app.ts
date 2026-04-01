@@ -70,14 +70,7 @@ export function initApp(root: HTMLElement): void {
         compressBtn.textContent = 'Compress'
         fileCountEl.style.display = 'block'
         fileCountEl.textContent = `${selectedFiles.length} PDF${selectedFiles.length !== 1 ? 's' : ''} selected`
-        fileListEl.innerHTML = ''
-        fileListEl.style.display = 'block'
-        for (const f of selectedFiles) {
-          const li = document.createElement('li')
-          li.className = 'file-list__item'
-          li.textContent = f.name
-          fileListEl.appendChild(li)
-        }
+        renderFileList()
         break
       case 'compressing':
         compressBtn.disabled = true
@@ -88,6 +81,45 @@ export function initApp(root: HTMLElement): void {
         break
     }
   }
+
+  // --- Helpers ---
+
+  function renderFileList(): void {
+    fileListEl.innerHTML = ''
+    fileListEl.style.display = 'block'
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const li = document.createElement('li')
+      li.className = 'file-list__item'
+
+      const name = document.createElement('span')
+      name.className = 'file-list__name'
+      name.textContent = selectedFiles[i].name
+
+      const removeBtn = document.createElement('button')
+      removeBtn.className = 'file-list__remove'
+      removeBtn.textContent = '×'
+      removeBtn.type = 'button'
+      removeBtn.setAttribute('aria-label', `Remove ${selectedFiles[i].name}`)
+      removeBtn.dataset.index = String(i)
+
+      li.appendChild(name)
+      li.appendChild(removeBtn)
+      fileListEl.appendChild(li)
+    }
+  }
+
+  fileListEl.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.file-list__remove') as HTMLElement | null
+    if (!btn) return
+    const idx = Number(btn.dataset.index)
+    selectedFiles = selectedFiles.filter((_, i) => i !== idx)
+    if (selectedFiles.length === 0) {
+      setState('idle')
+    } else {
+      fileCountEl.textContent = `${selectedFiles.length} PDF${selectedFiles.length !== 1 ? 's' : ''} selected`
+      renderFileList()
+    }
+  })
 
   // --- Callbacks ---
 
