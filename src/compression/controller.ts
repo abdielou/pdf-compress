@@ -74,6 +74,7 @@ export class CompressionController {
   private workers: Worker[]
   private poolSize: number
   private ready: Promise<void>
+  public isReady: boolean = false
 
   constructor() {
     this.poolSize = getPoolSize()
@@ -93,7 +94,13 @@ export class CompressionController {
           sendCommand(w, { type: 'init' })
         })
       )
-    ).then(() => {})
+    ).then(() => {
+      this.isReady = true
+    })
+  }
+
+  public waitUntilReady(): Promise<void> {
+    return this.ready
   }
 
   async compressFiles(
