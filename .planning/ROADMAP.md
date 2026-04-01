@@ -46,11 +46,11 @@ Plans:
   3. User can set a max file size target or a percentage reduction target and toggle between them
   4. During compression, user sees per-file progress indicating which file is being processed and how far along it is
   5. If WASM is still loading when user initiates compression, a loading state is shown instead of an error
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Drop zone, file validation, target config UI with test infrastructure
+- [ ] 02-02-PLAN.md — Progress UI, app orchestrator, controller ready state, browser verification
 
 ### Phase 3: Results and Download
 **Goal**: Users see compression results for every file, can download individually or as ZIP, can restart, and trust that files stayed private
@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Compression Engine | 3/3 | Complete | 2026-04-01 |
-| 2. File Input and Progress UI | 0/0 | Not started | - |
+| 2. File Input and Progress UI | 0/2 | In progress | - |
 | 3. Results and Download | 0/0 | Not started | - |
 | 4. Deployment and Cross-Browser | 0/0 | Not started | - |
