@@ -30,6 +30,5 @@ export async function compressFiles(
 export { controller }
 export type { CompressionTarget, CompressionResult }
 
-const cores = navigator.hardwareConcurrency || 2
-const workers = Math.max(2, Math.floor(cores / 2))
-console.log(`PDF Compress: ${cores} cores detected, ${workers} workers spawned`)
+import { initApp } from './ui/app'
+initApp(document.getElementById('app')!)

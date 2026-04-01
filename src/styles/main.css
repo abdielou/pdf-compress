@@ -159,3 +159,100 @@ h1 small {
   font-size: 0.875rem;
   color: #a0a0b0;
 }
+
+/* Compress button */
+
+.compress-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 16px;
+  background-color: #6c8aff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.compress-btn:hover:not(:disabled) {
+  background-color: #8aa4ff;
+}
+
+.compress-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* File count */
+
+.file-count {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: #a0a0b0;
+}
+
+/* Progress */
+
+.progress-container {
+  margin-top: 20px;
+}
+
+.progress-status {
+  font-size: 14px;
+  color: #ccc;
+  margin: 0 0 6px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #6c8aff;
+  transition: width 0.3s ease-out;
+}
+
+.progress-iteration {
+  display: block;
+  font-size: 12px;
+  color: #888;
+}
+
+.progress-files {
+  margin-top: 12px;
+}
+
+.progress-file-row {
+  padding: 4px 0;
+  border-bottom: 1px solid #333;
+  font-size: 0.875rem;
+}
+
+.progress-file-row--error {
+  color: #ff6b6b;
+}
+
+.progress-file-row--success {
+  color: #4ade80;
+}
+
+.progress-loading {
+  margin-top: 12px;
+  padding: 12px;
+  text-align: center;
+  color: #a0a0b0;
+  font-size: 0.875rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
