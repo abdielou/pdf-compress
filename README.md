@@ -1,4 +1,4 @@
-# Safe PDF Compress
+# Safe PDF Resize
 
 Compress PDF files directly in your browser. No uploads, no server, no data ever leaves your device.
 
