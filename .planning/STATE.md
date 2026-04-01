@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 02-01-PLAN.md (File Input and Progress UI - Plan 1)
-last_updated: "2026-04-01T17:27:30.305Z"
-last_activity: 2026-04-01 -- Plan 01-03 complete, Phase 1 complete
+status: executing
+stopped_at: "Checkpoint reached: Task 3 browser verification for 02-02"
+last_updated: "2026-04-01T17:33:14.654Z"
+last_activity: 2026-04-01 -- Plan 02-01 complete (file input UI, validation, target config)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 80
 ---
 
@@ -25,29 +25,29 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 
 ## Current Position
 
-Phase: 2 of 4 (File Input and Progress UI) -- In Progress
-Plan: 1 of 2 complete in current phase
-Status: Phase 2 In Progress
-Last activity: 2026-04-01 -- Plan 02-01 complete (file input UI, validation, target config)
+Phase: 2 of 4 (File Input and Progress UI) -- Awaiting browser verification
+Plan: 2 of 2 auto tasks complete in current phase (Task 3 checkpoint:human-verify pending)
+Status: Phase 2 Checkpoint Reached
+Last activity: 2026-04-01 -- Plan 02-02 complete (progress UI, app orchestrator, browser verify pending)
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 8 min
-- Total execution time: 0.51 hours
+- Total plans completed: 5
+- Average duration: 7 min
+- Total execution time: 0.58 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Compression Engine | 3/3 | 26 min | 9 min |
-| 2. File Input and Progress UI | 1/2 | 5 min | 5 min |
+| 2. File Input and Progress UI | 2/2 | 10 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (9 min), 01-02 (2 min), 01-03 (15 min), 02-01 (5 min)
+- Last 5 plans: 01-01 (9 min), 01-02 (2 min), 01-03 (15 min), 02-01 (5 min), 02-02 (5 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -73,6 +73,9 @@ Recent decisions affecting current work:
 - [Phase 02-01]: vitest 4 removed environmentMatchGlobs -- use @vitest-environment jsdom comment annotation per test file instead
 - [Phase 02-01]: Magic bytes (%PDF-, 5 bytes) are authoritative for PDF detection -- application/pdf MIME type not trusted
 - [Phase 02-01]: Counter-based drag flicker prevention for drop zone (dragenter increments, dragleave decrements)
+- [Phase 02-02]: ProgressUI uses purely DOM-driven state (no internal arrays) -- simpler, easy to test in jsdom
+- [Phase 02-02]: lastFileIndex tracking in app.ts avoids re-calling showFileProgress on every iteration of same file
+- [Phase 02-02]: initApp called as side-effect from main.ts import; main.ts serves as both entry point and exported API
 
 ### Pending Todos
 
@@ -85,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T17:27:30.304Z
-Stopped at: Completed 02-01-PLAN.md (File Input and Progress UI - Plan 1)
+Last session: 2026-04-01T17:33:14.653Z
+Stopped at: Checkpoint reached: Task 3 browser verification for 02-02
 Resume file: None

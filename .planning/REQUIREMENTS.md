@@ -28,10 +28,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Progress & Feedback
 
-- [ ] **PRG-01**: Per-file status shows "Compressing X/N... filename.pdf" during batch processing
-- [ ] **PRG-02**: Progress bar updates per file during compression
-- [ ] **PRG-03**: If user clicks compress before WASM is ready, a loading state is shown
-- [ ] **PRG-04**: Errors during compression are displayed per-file (not as a crash)
+- [x] **PRG-01**: Per-file status shows "Compressing X/N... filename.pdf" during batch processing
+- [x] **PRG-02**: Progress bar updates per file during compression
+- [x] **PRG-03**: If user clicks compress before WASM is ready, a loading state is shown
+- [x] **PRG-04**: Errors during compression are displayed per-file (not as a crash)
 
 ### Results & Download
 
@@ -97,10 +97,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | INP-04 | Phase 2 | Complete |
 | INP-05 | Phase 2 | Complete |
 | INP-06 | Phase 2 | Complete |
-| PRG-01 | Phase 2 | Pending |
-| PRG-02 | Phase 2 | Pending |
-| PRG-03 | Phase 2 | Pending |
-| PRG-04 | Phase 2 | Pending |
+| PRG-01 | Phase 2 | Complete |
+| PRG-02 | Phase 2 | Complete |
+| PRG-03 | Phase 2 | Complete |
+| PRG-04 | Phase 2 | Complete |
 | RES-01 | Phase 3 | Pending |
 | RES-02 | Phase 3 | Pending |
 | RES-03 | Phase 3 | Pending |

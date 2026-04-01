@@ -13,7 +13,7 @@ PDF Compress delivers a browser-based, fully client-side PDF compression tool in
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Compression Engine** - WASM-powered compression pipeline running in a Web Worker with binary search quality optimization
-- [ ] **Phase 2: File Input and Progress UI** - Drag-and-drop multi-file upload with target mode selection and per-file progress feedback
+- [x] **Phase 2: File Input and Progress UI** - Drag-and-drop multi-file upload with target mode selection and per-file progress feedback (completed 2026-04-01)
 - [ ] **Phase 3: Results and Download** - Results table, ZIP download, restart flow, and privacy/trust messaging
 - [ ] **Phase 4: Deployment and Cross-Browser** - Vercel static deployment with correct WASM serving and cross-browser validation
 
@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Compression Engine | 3/3 | Complete | 2026-04-01 |
-| 2. File Input and Progress UI | 1/2 | In Progress|  |
+| 2. File Input and Progress UI | 2/2 | Complete   | 2026-04-01 |
 | 3. Results and Download | 0/0 | Not started | - |
 | 4. Deployment and Cross-Browser | 0/0 | Not started | - |
