@@ -65,7 +65,7 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
           const buffer = result.buffer.slice(
             result.byteOffset,
             result.byteOffset + result.byteLength
-          )
+          ) as ArrayBuffer
           post(
             {
               type: 'file-done',
