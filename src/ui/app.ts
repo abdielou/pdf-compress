@@ -31,6 +31,12 @@ export function initApp(root: HTMLElement): void {
   fileCountEl.style.display = 'none'
   dropSection.appendChild(fileCountEl)
 
+  // File list
+  const fileListEl = document.createElement('ul')
+  fileListEl.className = 'file-list'
+  fileListEl.style.display = 'none'
+  dropSection.appendChild(fileListEl)
+
   const dropZone = createDropZone(dropSection, onFiles)
 
   // Compress button (initially hidden)
@@ -54,6 +60,8 @@ export function initApp(root: HTMLElement): void {
       case 'idle':
         compressBtn.style.display = 'none'
         fileCountEl.style.display = 'none'
+        fileListEl.style.display = 'none'
+        fileListEl.innerHTML = ''
         progressUI.reset()
         break
       case 'files-selected':
@@ -62,6 +70,14 @@ export function initApp(root: HTMLElement): void {
         compressBtn.textContent = 'Compress'
         fileCountEl.style.display = 'block'
         fileCountEl.textContent = `${selectedFiles.length} PDF${selectedFiles.length !== 1 ? 's' : ''} selected`
+        fileListEl.innerHTML = ''
+        fileListEl.style.display = 'block'
+        for (const f of selectedFiles) {
+          const li = document.createElement('li')
+          li.className = 'file-list__item'
+          li.textContent = f.name
+          fileListEl.appendChild(li)
+        }
         break
       case 'compressing':
         compressBtn.disabled = true
