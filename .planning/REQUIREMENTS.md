@@ -11,10 +11,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **ENG-01**: WASM binary loads in a Web Worker without blocking UI render
 - [x] **ENG-02**: WASM binary begins downloading immediately on page load (background preload)
-- [ ] **ENG-03**: Binary search on DPI (30-300) finds highest quality that fits under target size
-- [ ] **ENG-04**: Binary search on DPI finds highest quality that achieves target % reduction
-- [ ] **ENG-05**: Files already under target size are skipped (not recompressed)
-- [ ] **ENG-06**: Emscripten virtual filesystem is cleaned between files to prevent state leaks
+- [x] **ENG-03**: Binary search on DPI (30-300) finds highest quality that fits under target size
+- [x] **ENG-04**: Binary search on DPI finds highest quality that achieves target % reduction
+- [x] **ENG-05**: Files already under target size are skipped (not recompressed)
+- [x] **ENG-06**: Emscripten virtual filesystem is cleaned between files to prevent state leaks
 - [x] **ENG-07**: PDF bytes are transferred to/from worker using Transferable objects (zero-copy)
 
 ### File Input
@@ -86,10 +86,10 @@ Deferred to future release. Tracked but not in current roadmap.
 |-------------|-------|--------|
 | ENG-01 | Phase 1 | Complete |
 | ENG-02 | Phase 1 | Complete |
-| ENG-03 | Phase 1 | Pending |
-| ENG-04 | Phase 1 | Pending |
-| ENG-05 | Phase 1 | Pending |
-| ENG-06 | Phase 1 | Pending |
+| ENG-03 | Phase 1 | Complete |
+| ENG-04 | Phase 1 | Complete |
+| ENG-05 | Phase 1 | Complete |
+| ENG-06 | Phase 1 | Complete |
 | ENG-07 | Phase 1 | Complete |
 | INP-01 | Phase 2 | Pending |
 | INP-02 | Phase 2 | Pending |
