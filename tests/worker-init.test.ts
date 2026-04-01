@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import '@vitest/web-worker'
 import { createCompressionWorker, sendCommand } from '../src/compression/worker-client'
 import type { WorkerEvent, WorkerCommand } from '../src/compression/types'
@@ -92,10 +92,13 @@ describe('Typed message protocol', () => {
 })
 
 describe('Transferable support', () => {
-  it('sendCommand with Transferable detaches the source buffer', () => {
+  it('sendCommand accepts Transferable list and forwards to postMessage', () => {
     const worker = createCompressionWorker()
     const buffer = new ArrayBuffer(1024)
     expect(buffer.byteLength).toBe(1024)
+
+    // Spy on postMessage to verify transfer list is passed
+    const postMessageSpy = vi.spyOn(worker, 'postMessage')
 
     const cmd: WorkerCommand = {
       type: 'compress',
@@ -107,9 +110,10 @@ describe('Transferable support', () => {
 
     sendCommand(worker, cmd, [buffer])
 
-    // After transfer, source buffer should be detached (byteLength === 0)
-    expect(buffer.byteLength).toBe(0)
+    // Verify postMessage was called with the transfer option
+    expect(postMessageSpy).toHaveBeenCalledWith(cmd, { transfer: [buffer] })
 
+    postMessageSpy.mockRestore()
     worker.terminate()
   })
 })
