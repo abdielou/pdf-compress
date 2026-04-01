@@ -6,10 +6,15 @@ export default defineConfig({
   test: {
     testTimeout: 60000,
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
+    forks: {
+      singleFork: true,
     },
+    environmentMatchGlobs: [
+      ['tests/drop-zone.test.ts', 'jsdom'],
+      ['tests/file-validation.test.ts', 'jsdom'],
+      ['tests/target-config.test.ts', 'jsdom'],
+      ['tests/progress.test.ts', 'jsdom'],
+      ['tests/app.test.ts', 'jsdom'],
+    ],
   },
 })
