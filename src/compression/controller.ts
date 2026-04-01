@@ -9,13 +9,11 @@ const MAX_DPI = 300
 const LOW_PROBE_DPI = 72
 const MIN_DPI = 30
 const MIN_WORKERS = 2  // Need at least 2 for parallel probes
-const MAX_WORKERS = 4  // Diminishing returns beyond this
 
 function getPoolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2
-  // Use half the cores (compression is CPU-heavy, leave room for UI + OS)
-  // But at least 2 (for parallel probes) and at most 4
-  return Math.max(MIN_WORKERS, Math.min(MAX_WORKERS, Math.floor(cores / 2)))
+  // Use half the cores (leave room for UI thread + OS), minimum 2 for parallel probes
+  return Math.max(MIN_WORKERS, Math.floor(cores / 2))
 }
 
 /**
