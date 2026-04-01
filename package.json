@@ -1,0 +1,25 @@
+{
+  "name": "pdf-compress",
+  "version": "1.0.0",
+  "description": "Browser-based PDF compression using Ghostscript WASM",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@jspawn/ghostscript-wasm": "^0.0.2"
+  },
+  "devDependencies": {
+    "@vitest/web-worker": "^4.1.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.2"
+  }
+}
