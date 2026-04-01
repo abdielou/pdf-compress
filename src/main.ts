@@ -1,12 +1,8 @@
-import { createCompressionWorker, sendCommand } from './compression/worker-client'
 import { CompressionController } from './compression/controller'
 import type { CompressionTarget, CompressionResult } from './compression/types'
 
-// Eager worker start (ENG-02): spawn immediately on page load
-const worker = createCompressionWorker()
-sendCommand(worker, { type: 'init' })
-
-const controller = new CompressionController(worker)
+// Controller creates and manages its own worker pool (2 workers)
+const controller = new CompressionController()
 
 /**
  * Compress PDF files to a target size or percentage reduction.
@@ -34,5 +30,4 @@ export async function compressFiles(
 export { controller }
 export type { CompressionTarget, CompressionResult }
 
-// Log when controller is available
 console.log('PDF Compress controller initialized')

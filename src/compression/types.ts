@@ -6,32 +6,28 @@ export type CompressionTarget =
 export type WorkerCommand =
   | { type: 'init' }
   | {
-      type: 'compress'
+      type: 'compress-at-dpi'
       fileIndex: number
-      fileName: string
       buffer: ArrayBuffer
-      target: CompressionTarget
+      dpi: number
     }
 
 // Worker --> Main
 export type WorkerEvent =
   | { type: 'ready' }
   | {
-      type: 'progress'
+      type: 'dpi-result'
       fileIndex: number
-      iteration: number
-      totalEstimated: number
-      currentDpi: number
-      currentSize: number
-    }
-  | {
-      type: 'file-done'
-      fileIndex: number
-      compressedSize: number
+      dpi: number
+      size: number
       buffer: ArrayBuffer
     }
-  | { type: 'file-skipped'; fileIndex: number; reason: 'already-fits' }
-  | { type: 'file-error'; fileIndex: number; error: string }
+  | {
+      type: 'dpi-error'
+      fileIndex: number
+      dpi: number
+      error: string
+    }
 
 export interface CompressionResult {
   fileIndex: number

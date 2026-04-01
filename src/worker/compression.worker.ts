@@ -1,6 +1,6 @@
 import type { WorkerCommand, WorkerEvent } from '../compression/types'
 import { initGhostscript, getGs } from './ghostscript'
-import { binarySearchCompress } from './engine'
+import { compressAtDpi } from './engine'
 
 function post(event: WorkerEvent, transfer?: Transferable[]) {
   self.postMessage(event, { transfer } as StructuredSerializeOptions)
@@ -15,77 +15,55 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
         await initGhostscript()
         post({ type: 'ready' })
       } catch (err) {
-        // Post error if init fails - fileIndex 0 is used as placeholder
         post({
-          type: 'file-error',
+          type: 'dpi-error',
           fileIndex: -1,
+          dpi: 0,
           error: `WASM init failed: ${err instanceof Error ? err.message : String(err)}`,
         })
       }
       break
     }
-    case 'compress': {
+    case 'compress-at-dpi': {
       try {
         const input = new Uint8Array(cmd.buffer)
+        const gs = getGs()
 
-        // Convert CompressionTarget to targetBytes
-        const targetBytes =
-          cmd.target.mode === 'size'
-            ? cmd.target.maxBytes
-            : Math.floor(input.length * (1 - cmd.target.reductionPct / 100))
-
-        // Skip check (ENG-05): file already under target size
-        if (input.length <= targetBytes) {
-          post({
-            type: 'file-skipped',
-            fileIndex: cmd.fileIndex,
-            reason: 'already-fits',
-          })
-          break
-        }
-
-        // Run binary search compression
-        const result = binarySearchCompress(
-          getGs(),
-          input,
-          targetBytes,
-          (iteration, currentDpi, currentSize) => {
+        // Write input, compress, clean up
+        gs.FS.writeFile('/input.pdf', input)
+        try {
+          const result = compressAtDpi(gs, cmd.dpi)
+          if (result) {
+            const buffer = result.bytes.buffer.slice(
+              result.bytes.byteOffset,
+              result.bytes.byteOffset + result.bytes.byteLength
+            ) as ArrayBuffer
+            post(
+              {
+                type: 'dpi-result',
+                fileIndex: cmd.fileIndex,
+                dpi: cmd.dpi,
+                size: result.size,
+                buffer,
+              },
+              [buffer]
+            )
+          } else {
             post({
-              type: 'progress',
+              type: 'dpi-error',
               fileIndex: cmd.fileIndex,
-              iteration,
-              totalEstimated: 11, // 1 initial + max 10 binary search
-              currentDpi,
-              currentSize,
+              dpi: cmd.dpi,
+              error: `Ghostscript returned non-zero at DPI ${cmd.dpi}`,
             })
           }
-        )
-
-        if (result) {
-          const buffer = result.buffer.slice(
-            result.byteOffset,
-            result.byteOffset + result.byteLength
-          ) as ArrayBuffer
-          post(
-            {
-              type: 'file-done',
-              fileIndex: cmd.fileIndex,
-              compressedSize: result.length,
-              buffer,
-            },
-            [buffer]
-          )
-        } else {
-          post({
-            type: 'file-error',
-            fileIndex: cmd.fileIndex,
-            error: 'Could not compress to target size even at minimum DPI',
-          })
+        } finally {
+          try { gs.FS.unlink('/input.pdf') } catch { /* may not exist */ }
         }
       } catch (err) {
         post({
-          type: 'file-error',
+          type: 'dpi-error',
           fileIndex: cmd.fileIndex,
+          dpi: cmd.dpi,
           error: err instanceof Error ? err.message : String(err),
         })
       }

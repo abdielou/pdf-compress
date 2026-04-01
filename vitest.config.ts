@@ -6,5 +6,6 @@ export default defineConfig({
   test: {
     testTimeout: 60000,
     pool: 'forks',
+    fileParallelism: false,
   },
 })

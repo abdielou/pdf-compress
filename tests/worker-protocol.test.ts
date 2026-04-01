@@ -3,8 +3,7 @@ import { sendCommand } from '../src/compression/worker-client'
 import type { WorkerCommand, WorkerEvent } from '../src/compression/types'
 
 describe('Worker protocol: Transferable handling', () => {
-  it('Protocol Test 1: sendCommand includes buffer in transfer list for compress commands', () => {
-    // Create a minimal mock worker
+  it('Protocol Test 1: sendCommand includes buffer in transfer list for compress-at-dpi', () => {
     const postMessageSpy = vi.fn()
     const mockWorker = {
       postMessage: postMessageSpy,
@@ -15,11 +14,10 @@ describe('Worker protocol: Transferable handling', () => {
 
     const buffer = new ArrayBuffer(1024)
     const cmd: WorkerCommand = {
-      type: 'compress',
+      type: 'compress-at-dpi',
       fileIndex: 0,
-      fileName: 'test.pdf',
       buffer,
-      target: { mode: 'size', maxBytes: 500 },
+      dpi: 150,
     }
 
     sendCommand(mockWorker, cmd, [buffer])
@@ -45,61 +43,38 @@ describe('Worker protocol: Transferable handling', () => {
 
 describe('Worker protocol: type exhaustiveness', () => {
   it('Protocol Test 3: all WorkerEvent types are handled (no unhandled case)', () => {
-    // This tests type exhaustiveness at compile time + runtime
     function handleEvent(event: WorkerEvent): string {
       switch (event.type) {
         case 'ready':
           return 'ready'
-        case 'progress':
-          return `progress:${event.iteration}`
-        case 'file-done':
-          return `done:${event.compressedSize}`
-        case 'file-skipped':
-          return `skipped:${event.reason}`
-        case 'file-error':
-          return `error:${event.error}`
+        case 'dpi-result':
+          return `result:dpi=${event.dpi},size=${event.size}`
+        case 'dpi-error':
+          return `error:dpi=${event.dpi},${event.error}`
         default: {
-          // TypeScript exhaustive check: if all cases are handled,
-          // 'event' should be 'never' here
           const _exhaustive: never = event
           return _exhaustive
         }
       }
     }
 
-    // Verify all event types are handled correctly
     expect(handleEvent({ type: 'ready' })).toBe('ready')
     expect(
       handleEvent({
-        type: 'progress',
+        type: 'dpi-result',
         fileIndex: 0,
-        iteration: 3,
-        totalEstimated: 11,
-        currentDpi: 200,
-        currentSize: 4_000_000,
-      })
-    ).toBe('progress:3')
-    expect(
-      handleEvent({
-        type: 'file-done',
-        fileIndex: 0,
-        compressedSize: 3_000_000,
+        dpi: 200,
+        size: 4_000_000,
         buffer: new ArrayBuffer(0),
       })
-    ).toBe('done:3000000')
+    ).toBe('result:dpi=200,size=4000000')
     expect(
       handleEvent({
-        type: 'file-skipped',
+        type: 'dpi-error',
         fileIndex: 0,
-        reason: 'already-fits',
-      })
-    ).toBe('skipped:already-fits')
-    expect(
-      handleEvent({
-        type: 'file-error',
-        fileIndex: 0,
+        dpi: 200,
         error: 'something failed',
       })
-    ).toBe('error:something failed')
+    ).toBe('error:dpi=200,something failed')
   })
 })
