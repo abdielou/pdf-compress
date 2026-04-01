@@ -12,7 +12,7 @@ PDF Compress delivers a browser-based, fully client-side PDF compression tool in
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Compression Engine** - WASM-powered compression pipeline running in a Web Worker with binary search quality optimization
+- [x] **Phase 1: Compression Engine** - WASM-powered compression pipeline running in a Web Worker with binary search quality optimization
 - [ ] **Phase 2: File Input and Progress UI** - Drag-and-drop multi-file upload with target mode selection and per-file progress feedback
 - [ ] **Phase 3: Results and Download** - Results table, ZIP download, restart flow, and privacy/trust messaging
 - [ ] **Phase 4: Deployment and Cross-Browser** - Vercel static deployment with correct WASM serving and cross-browser validation
@@ -33,8 +33,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Scaffold Vite 8 project, validate WASM-in-Worker, establish typed message protocol
-- [ ] 01-02-PLAN.md — Implement binary search compression engine with mocked-GS tests and worker wiring
-- [ ] 01-03-PLAN.md — Build main-thread controller, wire end-to-end pipeline, browser verification
+- [x] 01-02-PLAN.md — Implement binary search compression engine with mocked-GS tests and worker wiring
+- [x] 01-03-PLAN.md — Build main-thread controller, wire end-to-end pipeline, browser verification
 
 ### Phase 2: File Input and Progress UI
 **Goal**: Users can drop or select PDF files, configure compression targets, and see live feedback as each file is processed
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Compression Engine | 1/3 | In Progress | - |
+| 1. Compression Engine | 3/3 | Complete | 2026-04-01 |
 | 2. File Input and Progress UI | 0/0 | Not started | - |
 | 3. Results and Download | 0/0 | Not started | - |
 | 4. Deployment and Cross-Browser | 0/0 | Not started | - |
