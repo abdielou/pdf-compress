@@ -5,18 +5,21 @@ type GsModule = Awaited<ReturnType<typeof Module>>
 let gs: GsModule | null = null
 const stderrBuffer: string[] = []
 
-function resolveWasmUrl(file: string): string {
-  return new URL(
-    `../../node_modules/@jspawn/ghostscript-wasm/${file}`,
-    import.meta.url
-  ).href
-}
-
 // Detect Node.js environment (used for test-time WASM loading workaround)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isNode = typeof (globalThis as any).process !== 'undefined'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   && (globalThis as any).process.versions?.node
+
+const JSDELIVR_WASM = 'https://cdn.jsdelivr.net/npm/@jspawn/ghostscript-wasm@0.0.2/gs.wasm'
+
+function resolveWasmUrl(file: string): string {
+  // In browser: serve the WASM from jsDelivr CDN to avoid Vercel bandwidth costs
+  if (!isNode && file === 'gs.wasm') return JSDELIVR_WASM
+  // In Node (tests): use local file — break static string so Vite doesn't bundle the WASM
+  const base = '../../node_modules/@jspawn/ghostscript-wasm/'
+  return new URL(base + file, import.meta.url).href
+}
 
 export async function initGhostscript(): Promise<void> {
   stderrBuffer.length = 0
