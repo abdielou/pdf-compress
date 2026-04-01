@@ -30,4 +30,4 @@ export async function compressFiles(
 export { controller }
 export type { CompressionTarget, CompressionResult }
 
-console.log('PDF Compress controller initialized')
+console.log('PDF Compress controller initialized (workers:', (navigator.hardwareConcurrency || 2), 'cores detected)')

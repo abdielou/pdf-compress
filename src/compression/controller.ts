@@ -8,7 +8,15 @@ import { createCompressionWorker, sendCommand } from './worker-client'
 const MAX_DPI = 300
 const LOW_PROBE_DPI = 72
 const MIN_DPI = 30
-const POOL_SIZE = 2
+const MIN_WORKERS = 2  // Need at least 2 for parallel probes
+const MAX_WORKERS = 4  // Diminishing returns beyond this
+
+function getPoolSize(): number {
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2
+  // Use half the cores (compression is CPU-heavy, leave room for UI + OS)
+  // But at least 2 (for parallel probes) and at most 4
+  return Math.max(MIN_WORKERS, Math.min(MAX_WORKERS, Math.floor(cores / 2)))
+}
 
 /**
  * Interpolate DPI using power-law model from two data points.
@@ -66,10 +74,12 @@ function compressAtDpi(
 
 export class CompressionController {
   private workers: Worker[]
+  private poolSize: number
   private ready: Promise<void>
 
   constructor() {
-    this.workers = Array.from({ length: POOL_SIZE }, () => createCompressionWorker())
+    this.poolSize = getPoolSize()
+    this.workers = Array.from({ length: this.poolSize }, () => createCompressionWorker())
 
     // Init all workers and wait for all to be ready
     this.ready = Promise.all(
@@ -103,11 +113,11 @@ export class CompressionController {
     const results: CompressionResult[] = new Array(files.length)
     const pending: Promise<void>[] = []
 
-    // Process files in pairs using both workers
-    for (let i = 0; i < files.length; i += POOL_SIZE) {
+    // Process files in batches using worker pool
+    for (let i = 0; i < files.length; i += this.poolSize) {
       const batch: Promise<void>[] = []
 
-      for (let j = 0; j < POOL_SIZE && i + j < files.length; j++) {
+      for (let j = 0; j < this.poolSize && i + j < files.length; j++) {
         const fileIdx = i + j
         const file = files[fileIdx]
         const originalSize = file.buffer.byteLength
@@ -132,7 +142,7 @@ export class CompressionController {
 
         // Assign a primary worker for this file
         const primaryWorker = this.workers[j]
-        const secondaryWorker = this.workers[(j + 1) % POOL_SIZE]
+        const secondaryWorker = this.workers[(j + 1) % this.poolSize]
 
         batch.push(
           this.compressFileWithParallelProbes(
