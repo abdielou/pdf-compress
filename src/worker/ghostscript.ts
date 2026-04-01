@@ -14,11 +14,10 @@ const isNode = typeof (globalThis as any).process !== 'undefined'
 const JSDELIVR_WASM = 'https://cdn.jsdelivr.net/npm/@jspawn/ghostscript-wasm@0.0.2/gs.wasm'
 
 function resolveWasmUrl(file: string): string {
-  // In browser: serve the WASM from jsDelivr CDN to avoid Vercel bandwidth costs
+  // In browser: serve the WASM from jsDelivr CDN — Vercel never serves the 16MB binary
   if (!isNode && file === 'gs.wasm') return JSDELIVR_WASM
-  // In Node (tests): use local file — break static string so Vite doesn't bundle the WASM
-  const base = '../../node_modules/@jspawn/ghostscript-wasm/'
-  return new URL(base + file, import.meta.url).href
+  // Static template literal so vite-plugin-wasm correctly bundles gs.js and friends
+  return new URL(`../../node_modules/@jspawn/ghostscript-wasm/${file}`, import.meta.url).href
 }
 
 export async function initGhostscript(): Promise<void> {
