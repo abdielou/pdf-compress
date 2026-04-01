@@ -3,12 +3,60 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Safe PDF Resize</title>
+    <title>Safe PDF Resize — Compress PDFs in Your Browser, 100% Private</title>
+    <meta name="description" content="Resize and compress PDF files directly in your browser. No uploads, no servers — your files never leave your device. Free, fast, and fully private." />
+    <meta name="keywords" content="PDF compressor, PDF resize, compress PDF online, reduce PDF size, PDF tool, private PDF compression, browser PDF tool" />
+    <link rel="canonical" href="https://pdf-compress-kappa.vercel.app/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Safe PDF Resize — 100% Private, In-Browser Compression" />
+    <meta property="og:description" content="Compress PDF files directly in your browser. No uploads, no servers — files never leave your device." />
+    <meta property="og:url" content="https://pdf-compress-kappa.vercel.app/" />
+    <meta property="og:site_name" content="Safe PDF Resize" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Safe PDF Resize — 100% Private, In-Browser Compression" />
+    <meta name="twitter:description" content="Compress PDF files directly in your browser. No uploads, no servers — files never leave your device." />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Safe PDF Resize",
+      "url": "https://pdf-compress-kappa.vercel.app/",
+      "description": "Resize and compress PDF files directly in your browser using Ghostscript WebAssembly. No uploads, no servers — your files never leave your device.",
+      "applicationCategory": "UtilityApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "browserRequirements": "Requires a modern browser with WebAssembly support",
+      "featureList": [
+        "Compress PDFs to a target file size",
+        "Reduce PDFs by percentage",
+        "Batch compress multiple PDFs",
+        "Download individually or as ZIP",
+        "100% client-side — no data uploaded"
+      ]
+    }
+    </script>
+
     <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
     <h1>Safe PDF Resize <small>Files never leave your browser</small></h1>
     <div id="app"></div>
+    <noscript>
+      <p>Safe PDF Resize requires JavaScript to run. Please enable JavaScript in your browser.</p>
+    </noscript>
+    <footer style="margin-top:48px;text-align:center;font-size:0.75rem;color:#999;">
+      <p>Your files are processed locally using WebAssembly. Nothing is ever uploaded.</p>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
