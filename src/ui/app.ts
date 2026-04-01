@@ -142,7 +142,14 @@ export function initApp(root: HTMLElement): void {
     // PRG-03: Check WASM readiness
     if (!controller.isReady) {
       progressUI.showLoading('Preparing compression engine...')
-      await controller.waitUntilReady()
+      try {
+        await controller.waitUntilReady()
+      } catch (err) {
+        progressUI.hideLoading()
+        progressUI.showFileError(-1, 'Engine', err instanceof Error ? err.message : 'WASM failed to load')
+        setState('done')
+        return
+      }
       progressUI.hideLoading()
     }
 

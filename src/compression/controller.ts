@@ -83,14 +83,20 @@ export class CompressionController {
     // Init all workers and wait for all to be ready
     this.ready = Promise.all(
       this.workers.map((w) =>
-        new Promise<void>((resolve) => {
+        new Promise<void>((resolve, reject) => {
           const handler = (e: MessageEvent<WorkerEvent>) => {
             if (e.data.type === 'ready') {
               w.removeEventListener('message', handler)
               resolve()
+            } else if (e.data.type === 'dpi-error' && e.data.fileIndex === -1) {
+              w.removeEventListener('message', handler)
+              reject(new Error(e.data.error))
             }
           }
           w.addEventListener('message', handler)
+          w.addEventListener('error', (err) => {
+            reject(new Error(`Worker error: ${err.message}`))
+          })
           sendCommand(w, { type: 'init' })
         })
       )
