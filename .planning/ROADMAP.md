@@ -29,11 +29,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Binary search finds the highest DPI that achieves a target percentage reduction (e.g., 50%)
   4. Files already under the target size are detected and skipped without recompression
   5. Multiple files can be processed sequentially without state leaking between them (Emscripten FS cleaned)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Scaffold Vite 8 project, validate WASM-in-Worker, establish typed message protocol
+- [ ] 01-02-PLAN.md — Implement binary search compression engine with mocked-GS tests and worker wiring
+- [ ] 01-03-PLAN.md — Build main-thread controller, wire end-to-end pipeline, browser verification
 
 ### Phase 2: File Input and Progress UI
 **Goal**: Users can drop or select PDF files, configure compression targets, and see live feedback as each file is processed
@@ -87,7 +88,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Compression Engine | 0/0 | Not started | - |
+| 1. Compression Engine | 0/3 | Planning complete | - |
 | 2. File Input and Progress UI | 0/0 | Not started | - |
 | 3. Results and Download | 0/0 | Not started | - |
 | 4. Deployment and Cross-Browser | 0/0 | Not started | - |
