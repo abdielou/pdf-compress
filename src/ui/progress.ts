@@ -48,15 +48,22 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
 
   function showFileProgress(fileIndex: number, totalFiles: number, fileName: string): void {
     statusEl.textContent = `Compressing ${fileIndex + 1}/${totalFiles}... ${fileName}`
+    // Disable transition briefly so the reset to 0 is instant, not animated backwards
+    fillEl.style.transition = 'none'
     fillEl.style.width = '0%'
+    // Re-enable transition on next frame
+    requestAnimationFrame(() => {
+      fillEl.style.transition = ''
+    })
     iterEl.textContent = ''
   }
 
   function updateIteration(iteration: number, dpi: number, size: number): void {
     iterEl.textContent = `Attempt ${iteration} at ${dpi} DPI (${formatSize(size)})`
-    // Estimate percentage: 5 iterations typical; cap at 90%
-    const pct = Math.min(90, (iteration / 5) * 100)
-    fillEl.style.width = `${pct}%`
+    // Move forward only — never let the bar go backwards
+    const next = Math.min(90, (iteration / 5) * 100)
+    const current = parseFloat(fillEl.style.width) || 0
+    fillEl.style.width = `${Math.max(current, next)}%`
   }
 
   function showFileComplete(fileIndex: number): void {

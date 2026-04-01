@@ -13,9 +13,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@jspawn/ghostscript-wasm": "^0.0.2"
+    "@jspawn/ghostscript-wasm": "^0.0.2",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.0",
     "@types/node": "^25.5.0",
     "@vitest/web-worker": "^4.1.2",
     "jsdom": "^29.0.1",

@@ -1,6 +1,7 @@
 import { createDropZone } from './drop-zone'
 import { createTargetConfig } from './target-config'
 import { createProgressUI } from './progress'
+import { renderResults } from './results'
 import { compressFiles, controller } from '../main'
 import type { CompressionResult } from '../compression/types'
 
@@ -52,6 +53,11 @@ export function initApp(root: HTMLElement): void {
   root.appendChild(progressSection)
   const progressUI = createProgressUI(progressSection)
 
+  // Results section
+  const resultsSection = document.createElement('div')
+  resultsSection.className = 'app-section'
+  root.appendChild(resultsSection)
+
   // --- State machine ---
 
   function setState(next: AppState): void {
@@ -63,6 +69,7 @@ export function initApp(root: HTMLElement): void {
         fileListEl.style.display = 'none'
         fileListEl.innerHTML = ''
         progressUI.reset()
+        resultsSection.innerHTML = ''
         break
       case 'files-selected':
         compressBtn.style.display = 'block'
@@ -165,6 +172,7 @@ export function initApp(root: HTMLElement): void {
       }
 
       lastResults = results
+      renderResults(resultsSection, results)
       setState('done')
     } catch (err) {
       // Unexpected error — show as generic message but don't crash
