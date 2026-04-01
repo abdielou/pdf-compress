@@ -89,6 +89,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Compression Engine | 3/3 | Complete | 2026-04-01 |
-| 2. File Input and Progress UI | 0/2 | In progress | - |
+| 2. File Input and Progress UI | 1/2 | In Progress|  |
 | 3. Results and Download | 0/0 | Not started | - |
 | 4. Deployment and Cross-Browser | 0/0 | Not started | - |

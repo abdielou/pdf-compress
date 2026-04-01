@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Completed 01-03-PLAN.md (Controller and End-to-End Pipeline) -- Phase 1 Complete
-last_updated: "2026-04-01T15:48:51.504Z"
+stopped_at: Completed 02-01-PLAN.md (File Input and Progress UI - Plan 1)
+last_updated: "2026-04-01T17:27:30.305Z"
 last_activity: 2026-04-01 -- Plan 01-03 complete, Phase 1 complete
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -21,32 +21,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** Files never leave the browser -- private, fast, zero-trust compression with maximum quality preserved.
-**Current focus:** Phase 1: Compression Engine
+**Current focus:** Phase 2: File Input and Progress UI
 
 ## Current Position
 
-Phase: 1 of 4 (Compression Engine) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase 1 Complete
-Last activity: 2026-04-01 -- Plan 01-03 complete, Phase 1 complete
+Phase: 2 of 4 (File Input and Progress UI) -- In Progress
+Plan: 1 of 2 complete in current phase
+Status: Phase 2 In Progress
+Last activity: 2026-04-01 -- Plan 02-01 complete (file input UI, validation, target config)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 9 min
-- Total execution time: 0.43 hours
+- Total plans completed: 4
+- Average duration: 8 min
+- Total execution time: 0.51 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Compression Engine | 3/3 | 26 min | 9 min |
+| 2. File Input and Progress UI | 1/2 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (9 min), 01-02 (2 min), 01-03 (15 min)
+- Last 5 plans: 01-01 (9 min), 01-02 (2 min), 01-03 (15 min), 02-01 (5 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - [01-03]: Controller awaits worker ready promise before processing any files
 - [01-03]: Sequential file processing via promise chain prevents Emscripten FS state leaks
 - [01-03]: Skip logic at controller level avoids unnecessary worker round-trips
+- [Phase 02-01]: vitest 4 removed environmentMatchGlobs -- use @vitest-environment jsdom comment annotation per test file instead
+- [Phase 02-01]: Magic bytes (%PDF-, 5 bytes) are authoritative for PDF detection -- application/pdf MIME type not trusted
+- [Phase 02-01]: Counter-based drag flicker prevention for drop zone (dragenter increments, dragleave decrements)
 
 ### Pending Todos
 
@@ -81,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01
-Stopped at: Completed 01-03-PLAN.md (Controller and End-to-End Pipeline) -- Phase 1 Complete
+Last session: 2026-04-01T17:27:30.304Z
+Stopped at: Completed 02-01-PLAN.md (File Input and Progress UI - Plan 1)
 Resume file: None

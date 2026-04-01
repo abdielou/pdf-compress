@@ -19,12 +19,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### File Input
 
-- [ ] **INP-01**: User can drag and drop one or more PDF files onto a drop zone
-- [ ] **INP-02**: User can click to browse and select PDF files as fallback
-- [ ] **INP-03**: Non-PDF files are rejected with a clear message
-- [ ] **INP-04**: User can set target as max file size (default 4MB)
-- [ ] **INP-05**: User can set target as % reduction (default 50%)
-- [ ] **INP-06**: User can toggle between size and % target modes
+- [x] **INP-01**: User can drag and drop one or more PDF files onto a drop zone
+- [x] **INP-02**: User can click to browse and select PDF files as fallback
+- [x] **INP-03**: Non-PDF files are rejected with a clear message
+- [x] **INP-04**: User can set target as max file size (default 4MB)
+- [x] **INP-05**: User can set target as % reduction (default 50%)
+- [x] **INP-06**: User can toggle between size and % target modes
 
 ### Progress & Feedback
 
@@ -91,12 +91,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | ENG-05 | Phase 1 | Complete |
 | ENG-06 | Phase 1 | Complete |
 | ENG-07 | Phase 1 | Complete |
-| INP-01 | Phase 2 | Pending |
-| INP-02 | Phase 2 | Pending |
-| INP-03 | Phase 2 | Pending |
-| INP-04 | Phase 2 | Pending |
-| INP-05 | Phase 2 | Pending |
-| INP-06 | Phase 2 | Pending |
+| INP-01 | Phase 2 | Complete |
+| INP-02 | Phase 2 | Complete |
+| INP-03 | Phase 2 | Complete |
+| INP-04 | Phase 2 | Complete |
+| INP-05 | Phase 2 | Complete |
+| INP-06 | Phase 2 | Complete |
 | PRG-01 | Phase 2 | Pending |
 | PRG-02 | Phase 2 | Pending |
 | PRG-03 | Phase 2 | Pending |
