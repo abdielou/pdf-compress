@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { isPdf, validateFiles } from '../src/ui/file-validation'
 

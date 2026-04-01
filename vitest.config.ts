@@ -9,12 +9,6 @@ export default defineConfig({
     forks: {
       singleFork: true,
     },
-    environmentMatchGlobs: [
-      ['tests/drop-zone.test.ts', 'jsdom'],
-      ['tests/file-validation.test.ts', 'jsdom'],
-      ['tests/target-config.test.ts', 'jsdom'],
-      ['tests/progress.test.ts', 'jsdom'],
-      ['tests/app.test.ts', 'jsdom'],
-    ],
+    // jsdom environment applied per-file via @vitest-environment jsdom comment
   },
 })
