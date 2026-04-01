@@ -9,6 +9,7 @@ export default defineConfig({
     forks: {
       singleFork: true,
     },
+    exclude: ['tests/e2e/**', 'node_modules/**'],
     // jsdom environment applied per-file via @vitest-environment jsdom comment
   },
 })
