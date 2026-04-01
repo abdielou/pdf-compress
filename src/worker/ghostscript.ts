@@ -1,27 +1,35 @@
-import Module from '@jspawn/ghostscript-wasm'
-
-type GsModule = Awaited<ReturnType<typeof Module>>
-
-let gs: GsModule | null = null
-const stderrBuffer: string[] = []
-
-// Detect Node.js environment (used for test-time WASM loading workaround)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isNode = typeof (globalThis as any).process !== 'undefined'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   && (globalThis as any).process.versions?.node
 
-const JSDELIVR_WASM = 'https://cdn.jsdelivr.net/npm/@jspawn/ghostscript-wasm@0.0.2/gs.wasm'
+const CDN_BASE = 'https://cdn.jsdelivr.net/npm/@jspawn/ghostscript-wasm@0.0.2'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GsModule = any
+let gs: GsModule | null = null
+const stderrBuffer: string[] = []
+
+async function loadModule(): Promise<(opts: Record<string, unknown>) => Promise<GsModule>> {
+  if (isNode) {
+    // In Node (tests): use local package
+    const mod = await import(/* @vite-ignore */ '@jspawn/ghostscript-wasm')
+    return mod.default
+  }
+  // In browser: load from CDN to bypass Vite bundling issues
+  const mod = await import(/* @vite-ignore */ `${CDN_BASE}/gs.mjs`)
+  return mod.default
+}
 
 function resolveWasmUrl(file: string): string {
-  // In browser: serve the WASM from jsDelivr CDN — Vercel never serves the 16MB binary
-  if (!isNode && file === 'gs.wasm') return JSDELIVR_WASM
-  // Static template literal so vite-plugin-wasm correctly bundles gs.js and friends
+  if (!isNode && file === 'gs.wasm') return `${CDN_BASE}/gs.wasm`
   return new URL(`../../node_modules/@jspawn/ghostscript-wasm/${file}`, import.meta.url).href
 }
 
 export async function initGhostscript(): Promise<void> {
   stderrBuffer.length = 0
+
+  const Module = await loadModule()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const opts: Record<string, any> = {
@@ -30,10 +38,6 @@ export async function initGhostscript(): Promise<void> {
     locateFile: resolveWasmUrl,
   }
 
-  // In Node (test environments), Emscripten's WASM loader is broken:
-  // - file:// URLs get mangled by path.normalize()
-  // - plain paths trigger fetch() in Node 18+ (which fails on local files)
-  // Provide instantiateWasm to bypass Emscripten's detection entirely.
   if (isNode) {
     const wasmUrl = resolveWasmUrl('gs.wasm')
     opts.instantiateWasm = (
@@ -41,8 +45,6 @@ export async function initGhostscript(): Promise<void> {
       successCallback: (instance: WebAssembly.Instance) => void
     ) => {
       ;(async () => {
-        // Dynamic imports typed as any to avoid requiring @types/node
-        // These only run in Node.js test environments, never in browser
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fsModule: any = await import(/* @vite-ignore */ 'fs')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,7 +54,7 @@ export async function initGhostscript(): Promise<void> {
         const result = await WebAssembly.instantiate(wasmBytes, imports)
         successCallback(result.instance)
       })()
-      return {} // Emscripten expects this return value
+      return {}
     }
   }
 
