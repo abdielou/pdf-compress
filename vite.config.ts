@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import wasm from 'vite-plugin-wasm'
 
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? '/pdf-compress/' : '/',
   plugins: [wasm()],
   worker: {
     plugins: () => [wasm()],
