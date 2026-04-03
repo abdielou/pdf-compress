@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pdf-compress-kappa.vercel.app/sitemap.xml
+Sitemap: https://abdielou.github.io/pdf-compress/sitemap.xml
