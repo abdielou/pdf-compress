@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#2563eb"/>
+  <g fill="white">
+    <!-- Document shape -->
+    <path d="M160 80h128l80 80v272c0 8.8-7.2 16-16 16H160c-8.8 0-16-7.2-16-16V96c0-8.8 7.2-16 16-16z"/>
+    <path d="M288 80v64c0 8.8 7.2 16 16 16h64" fill="none" stroke="white" stroke-width="8"/>
+    <!-- Compress arrows -->
+    <path d="M220 220l36-36 36 36" fill="none" stroke="#2563eb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M220 320l36 36 36-36" fill="none" stroke="#2563eb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- PDF text -->
+    <text x="256" y="290" text-anchor="middle" font-family="Arial,sans-serif" font-size="64" font-weight="bold" fill="#2563eb">PDF</text>
+  </g>
+</svg>
