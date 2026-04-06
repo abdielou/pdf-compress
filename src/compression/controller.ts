@@ -9,6 +9,8 @@ const MAX_DPI = 300
 const LOW_PROBE_DPI = 72
 const MIN_DPI = 30
 const MIN_WORKERS = 2  // Need at least 2 for parallel probes
+const GOOD_ENOUGH_RATIO = 0.90  // Stop if result is within 90% of target
+const MAX_REFINEMENTS = 3
 
 function getPoolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2
@@ -225,48 +227,39 @@ export class CompressionController {
       return this.buildResult(fileIndex, file.name, originalSize, bestResult)
     }
 
-    // Step 2: Interpolate from the two probes
-    const estimatedDpi = interpolateDpi(
-      LOW_PROBE_DPI, lowProbe.size,
-      MAX_DPI, highProbe?.size ?? originalSize,
-      targetBytes
-    )
+    // Step 2: Interpolate and refine until good enough
+    let lowDpi = LOW_PROBE_DPI
+    let lowSize = lowProbe.size
+    let highDpi = MAX_DPI
+    let highSize = highProbe?.size ?? originalSize
 
-    const interProbe = await compressAtDpi(workerA, fileIndex, file.buffer, estimatedDpi)
-    iteration++
-    if (interProbe) {
-      onProgress?.(fileIndex, iteration, estimatedDpi, interProbe.size)
-      trackBest(interProbe)
-    }
+    for (let r = 0; r < MAX_REFINEMENTS; r++) {
+      const estimatedDpi = interpolateDpi(lowDpi, lowSize, highDpi, highSize, targetBytes)
 
-    // Step 3: Refine if needed
-    if (interProbe) {
-      if (interProbe.size > targetBytes && !bestResult) {
-        // Overshot, no result yet — try between low and estimated
-        const refinedDpi = interpolateDpi(
-          LOW_PROBE_DPI, lowProbe.size,
-          estimatedDpi, interProbe.size,
-          targetBytes
-        )
-        const refineProbe = await compressAtDpi(workerA, fileIndex, file.buffer, refinedDpi)
-        iteration++
-        if (refineProbe) {
-          onProgress?.(fileIndex, iteration, refinedDpi, refineProbe.size)
-          trackBest(refineProbe)
-        }
-      } else if (interProbe.size <= targetBytes && interProbe.size < targetBytes * 0.85) {
-        // Undershot significantly — try higher for better quality
-        const refinedDpi = interpolateDpi(
-          estimatedDpi, interProbe.size,
-          MAX_DPI, highProbe?.size ?? originalSize,
-          targetBytes
-        )
-        const refineProbe = await compressAtDpi(workerA, fileIndex, file.buffer, refinedDpi)
-        iteration++
-        if (refineProbe) {
-          onProgress?.(fileIndex, iteration, refinedDpi, refineProbe.size)
-          trackBest(refineProbe)
-        }
+      // Avoid re-testing a DPI we've already tried
+      if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) break
+
+      const probe = await compressAtDpi(workerA, fileIndex, file.buffer, estimatedDpi)
+      iteration++
+      if (!probe) break
+
+      onProgress?.(fileIndex, iteration, estimatedDpi, probe.size)
+      trackBest(probe)
+
+      // Good enough — within 90% of target
+      if (probe.size <= targetBytes && probe.size >= targetBytes * GOOD_ENOUGH_RATIO) {
+        break
+      }
+
+      // Narrow the search bounds
+      if (probe.size > targetBytes) {
+        // Overshot — search lower
+        highDpi = estimatedDpi
+        highSize = probe.size
+      } else {
+        // Undershot — search higher for better quality
+        lowDpi = estimatedDpi
+        lowSize = probe.size
       }
     }
 

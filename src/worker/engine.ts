@@ -21,7 +21,8 @@ const INPUT_PATH = '/input.pdf'
 const OUTPUT_PATH = '/output.pdf'
 const MIN_DPI = 30
 const MAX_DPI = 300
-const MAX_ITERATIONS = 4
+const MAX_REFINEMENTS = 3
+const GOOD_ENOUGH_RATIO = 0.90
 
 /** Build Ghostscript arguments matching compress.sh exactly. */
 function buildGsArgs(dpi: number): string[] {
@@ -180,38 +181,34 @@ export function binarySearchCompress(
 
     // Now we have two data points: (300, highSize) and (72, lowSize)
     // and we know: lowSize <= target < highSize
-    const highSize = highProbe?.size ?? 0
+    let lowDpi = LOW_PROBE_DPI
+    let lowSize = lowProbe.size
+    let highDpi = MAX_DPI
+    let highSize = highProbe?.size ?? 0
 
-    // Step 3: Interpolate to estimate optimal DPI
-    const estimatedDpi = interpolateDpi(
-      LOW_PROBE_DPI, lowProbe.size,
-      MAX_DPI, highSize,
-      targetBytes
-    )
-    const interProbe = tryDpi(estimatedDpi)
+    // Step 3: Interpolate and refine until good enough
+    for (let r = 0; r < MAX_REFINEMENTS; r++) {
+      const estimatedDpi = interpolateDpi(lowDpi, lowSize, highDpi, highSize, targetBytes)
 
-    // Step 4: If we still don't have a result under target, or we can refine
-    if (iteration < MAX_ITERATIONS && interProbe) {
-      if (interProbe.size > targetBytes && bestResult) {
-        // Interpolation overshot — we already have a good result, done
-      } else if (interProbe.size > targetBytes) {
-        // Overshot and no result yet — try between low and estimated
-        const refinedDpi = interpolateDpi(
-          LOW_PROBE_DPI, lowProbe.size,
-          estimatedDpi, interProbe.size,
-          targetBytes
-        )
-        tryDpi(refinedDpi)
-      } else if (interProbe.size <= targetBytes && interProbe.size < targetBytes * 0.85) {
-        // Undershot significantly — try higher DPI for better quality
-        const refinedDpi = interpolateDpi(
-          estimatedDpi, interProbe.size,
-          MAX_DPI, highSize,
-          targetBytes
-        )
-        tryDpi(refinedDpi)
+      // Avoid re-testing a DPI we've already tried
+      if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) break
+
+      const probe = tryDpi(estimatedDpi)
+      if (!probe) break
+
+      // Good enough — within 90% of target
+      if (probe.size <= targetBytes && probe.size >= targetBytes * GOOD_ENOUGH_RATIO) {
+        break
       }
-      // else: close enough, bestResult is already good
+
+      // Narrow the search bounds
+      if (probe.size > targetBytes) {
+        highDpi = estimatedDpi
+        highSize = probe.size
+      } else {
+        lowDpi = estimatedDpi
+        lowSize = probe.size
+      }
     }
 
     return bestResult
