@@ -10,6 +10,10 @@ type AppState = 'idle' | 'files-selected' | 'compressing' | 'done'
 export let lastResults: CompressionResult[] = []
 
 export function initApp(root: HTMLElement): void {
+  // Own the root: a second call (e.g. duplicated module evaluation)
+  // must not stack a second copy of the UI
+  root.innerHTML = ''
+
   let state: AppState = 'idle'
   let selectedFiles: File[] = []
 

@@ -93,6 +93,21 @@ describe('App Orchestrator', () => {
     vi.resetModules()
   })
 
+  it('initApp is idempotent: a second call does not duplicate the UI', async () => {
+    const { initApp } = await import('../src/ui/app')
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    initApp(root)
+    initApp(root)
+
+    expect(root.querySelectorAll('.compress-btn')).toHaveLength(1)
+    expect(root.querySelectorAll('.app-section')).toHaveLength(4)
+
+    document.body.removeChild(root)
+    vi.resetModules()
+  })
+
   it('warmup: starts the compression engine when files are selected', async () => {
     const { controller } = await import('../src/main')
     const mockController = controller as unknown as { warmup: ReturnType<typeof vi.fn> }

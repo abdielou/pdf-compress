@@ -60,12 +60,8 @@
     </noscript>
     <footer style="margin-top:48px;text-align:center;font-size:0.75rem;color:#999;">
       <p>Your files are processed locally using WebAssembly. Nothing is ever uploaded.</p>
+      <p id="app-version"></p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/pdf-compress/sw.js')
-      }
-    </script>
   </body>
 </html>
