@@ -137,10 +137,10 @@ test.describe('Phase 2: File Input & Progress UI', () => {
     await expect(btn).toBeVisible()
     await btn.click()
 
-    // PRG-01: status text appears
+    // PRG-01: status text appears (fast files may already show "Done")
     const status = page.locator('.progress-status')
     await expect(status).toBeVisible({ timeout: 10000 })
-    await expect(status).toContainText(/compressing/i)
+    await expect(status).toContainText(/compressing|done/i)
 
     // PRG-02: progress bar appears
     const bar = page.locator('.progress-bar')

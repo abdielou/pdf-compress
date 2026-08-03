@@ -42,19 +42,32 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
 
   let names: string[] = []
   let rows: HTMLElement[] = []
+  // Per-file progress in [0, 1]; the bar shows the average, so it moves
+  // smoothly during long single-file runs and stays monotonic when
+  // concurrent files report out of order
+  let fractions: number[] = []
   let total = 0
   let completed = 0
+
+  // A typical search converges within this many Ghostscript passes;
+  // in-flight files approach (but never reach) full until they complete
+  const EXPECTED_ITERATIONS = 6
 
   function setRow(row: HTMLElement, state: 'queued' | 'active' | 'success' | 'error', text: string): void {
     row.className = `progress-file-row progress-file-row--${state}`
     row.textContent = text
   }
 
-  function fileDone(): void {
+  function renderBar(): void {
+    if (total === 0) return
+    const sum = fractions.reduce((a, b) => a + b, 0)
+    fillEl.style.width = `${Math.min(100, Math.round((sum / total) * 100))}%`
+  }
+
+  function fileDone(fileIndex: number): void {
     completed++
-    if (total > 0) {
-      fillEl.style.width = `${Math.min(100, Math.round((completed / total) * 100))}%`
-    }
+    if (fractions[fileIndex] !== undefined) fractions[fileIndex] = 1
+    renderBar()
     if (completed >= total && total > 0) {
       statusEl.textContent = 'Done'
     }
@@ -64,6 +77,7 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     names = [...fileNames]
     total = names.length
     completed = 0
+    fractions = names.map(() => 0)
     statusEl.textContent = `Compressing ${total} file${total !== 1 ? 's' : ''}...`
     fillEl.style.transition = 'none'
     fillEl.style.width = '0%'
@@ -83,19 +97,24 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     const row = rows[fileIndex]
     if (!row) return
     setRow(row, 'active', `${names[fileIndex]}: attempt ${iteration} at ${dpi} DPI (${formatSize(size)})`)
+    fractions[fileIndex] = Math.max(
+      fractions[fileIndex],
+      Math.min(0.9, iteration / EXPECTED_ITERATIONS)
+    )
+    renderBar()
   }
 
   function showFileComplete(fileIndex: number): void {
     const row = rows[fileIndex]
     if (row) setRow(row, 'success', `✓ ${names[fileIndex]}`)
-    fileDone()
+    fileDone(fileIndex)
   }
 
   function showFileError(fileIndex: number, fileName: string, message: string): void {
     const row = rows[fileIndex]
     if (row) {
       setRow(row, 'error', `${names[fileIndex]}: ${message}`)
-      fileDone()
+      fileDone(fileIndex)
       return
     }
     // No matching row (e.g. engine-level failure before a run starts)
@@ -119,6 +138,7 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     filesEl.textContent = ''
     names = []
     rows = []
+    fractions = []
     total = 0
     completed = 0
     loadingEl.style.display = 'none'

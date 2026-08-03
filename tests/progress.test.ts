@@ -37,6 +37,49 @@ describe('ProgressUI: per-file rows', () => {
     expect(rows[1].textContent).toContain('attempt 2')
   })
 
+  it('the bar advances during a single file run, not only at completion', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    const fill = container.querySelector('.progress-fill') as HTMLElement
+
+    ui.startRun(['only.pdf'])
+    expect(fill.style.width).toBe('0%')
+
+    ui.updateIteration(0, 1, 300, 5_000_000)
+    const afterFirst = parseFloat(fill.style.width)
+    expect(afterFirst).toBeGreaterThan(0)
+
+    ui.updateIteration(0, 3, 150, 3_000_000)
+    const afterThird = parseFloat(fill.style.width)
+    expect(afterThird).toBeGreaterThan(afterFirst)
+    // Never full before the file actually completes
+    expect(afterThird).toBeLessThan(100)
+
+    ui.showFileComplete(0)
+    expect(fill.style.width).toBe('100%')
+  })
+
+  it('the bar never moves backward across interleaved file updates', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    const fill = container.querySelector('.progress-fill') as HTMLElement
+
+    ui.startRun(['a.pdf', 'b.pdf'])
+    const widths: number[] = []
+    ui.updateIteration(0, 2, 150, 2_000_000)
+    widths.push(parseFloat(fill.style.width))
+    ui.updateIteration(1, 1, 300, 8_000_000)
+    widths.push(parseFloat(fill.style.width))
+    ui.updateIteration(0, 3, 120, 1_500_000)
+    widths.push(parseFloat(fill.style.width))
+    ui.showFileComplete(1)
+    widths.push(parseFloat(fill.style.width))
+
+    for (let i = 1; i < widths.length; i++) {
+      expect(widths[i]).toBeGreaterThanOrEqual(widths[i - 1])
+    }
+  })
+
   it('showFileComplete marks the row and advances the overall bar', () => {
     const container = document.createElement('div')
     const ui = createProgressUI(container)
