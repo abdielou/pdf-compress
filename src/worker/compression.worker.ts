@@ -1,5 +1,5 @@
 import type { WorkerCommand, WorkerEvent } from '../compression/types'
-import { initGhostscript, getGs } from './ghostscript'
+import { initGhostscript, getGs, getStderr } from './ghostscript'
 import { compressAtDpi } from './engine'
 
 function post(event: WorkerEvent, transfer?: Transferable[]) {
@@ -53,7 +53,8 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
               type: 'dpi-error',
               fileIndex: cmd.fileIndex,
               dpi: cmd.dpi,
-              error: `Ghostscript returned non-zero at DPI ${cmd.dpi}`,
+              // Include the stderr tail so failures are diagnosable in the field
+              error: `Ghostscript returned non-zero at DPI ${cmd.dpi}: ${getStderr().slice(-300)}`,
             })
           }
         } finally {
@@ -64,7 +65,8 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
           type: 'dpi-error',
           fileIndex: cmd.fileIndex,
           dpi: cmd.dpi,
-          error: err instanceof Error ? err.message : String(err),
+          // Include the stderr tail so failures are diagnosable in the field
+          error: `${err instanceof Error ? err.message : String(err)} | stderr: ${getStderr().slice(-300)}`,
         })
       }
       break

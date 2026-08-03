@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - heading "Safe PDF Resize Files never leave your browser" [level=1] [ref=e2]:
+    - text: Safe PDF Resize
+    - generic [ref=e3]: Files never leave your browser
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - button "Size" [ref=e8] [cursor=pointer]
+        - button "Percentage" [ref=e9] [cursor=pointer]
+      - generic [ref=e10]:
+        - generic [ref=e11]: Max file size
+        - spinbutton [ref=e12]: "4"
+        - generic [ref=e13]: MB
+    - paragraph [ref=e16] [cursor=pointer]:
+      - text: Drop PDF files here or
+      - button "browse" [ref=e17]
+    - generic [ref=e19]:
+      - paragraph
+  - contentinfo [ref=e21]:
+    - paragraph [ref=e22]: Your files are processed locally using WebAssembly. Nothing is ever uploaded.

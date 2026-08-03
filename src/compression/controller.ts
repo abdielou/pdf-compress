@@ -80,6 +80,8 @@ function compressAtDpi(
         cleanup()
         resolve({ dpi: event.dpi, size: event.size, buffer: event.buffer })
       } else if (event.type === 'dpi-error' && event.fileIndex === fileIndex) {
+        // Surfaced only in the console: the search continues at other DPIs
+        console.warn(`Compression pass failed at DPI ${dpi}: ${event.error}`)
         cleanup()
         resolve(null)
       }

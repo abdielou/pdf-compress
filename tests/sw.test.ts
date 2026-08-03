@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.mocked(fetch).mockReset()
 })
 
-function dispatchFetch(request: { method: string; url: string }) {
+function dispatchFetch(request: { method: string; url: string; mode?: string }) {
   let captured: Promise<Response> | undefined
   const event = {
     request,
@@ -72,6 +72,34 @@ describe('Fix 6: service worker offline fallback', () => {
 
     const response = await dispatchFetch({ method: 'GET', url: `${ORIGIN}/app.js` })!
     expect(response).toBe(fresh)
+  })
+
+  it('navigations are network-first: fresh deploy wins over cache', async () => {
+    const cachedPage = new Response('old-app')
+    const freshPage = new Response('new-app', { status: 200 })
+    vi.mocked(caches.match).mockResolvedValue(cachedPage)
+    vi.mocked(fetch).mockResolvedValue(freshPage)
+
+    const response = await dispatchFetch({ method: 'GET', url: `${ORIGIN}/`, mode: 'navigate' })!
+    expect(response).toBe(freshPage)
+  })
+
+  it('navigations fall back to cache when offline', async () => {
+    const cachedPage = new Response('old-app')
+    vi.mocked(caches.match).mockResolvedValue(cachedPage)
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network down'))
+
+    const response = await dispatchFetch({ method: 'GET', url: `${ORIGIN}/`, mode: 'navigate' })!
+    expect(response).toBe(cachedPage)
+  })
+
+  it('navigations return 503 when offline with no cache', async () => {
+    vi.mocked(caches.match).mockResolvedValue(undefined)
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network down'))
+
+    const response = await dispatchFetch({ method: 'GET', url: `${ORIGIN}/`, mode: 'navigate' })!
+    expect(response).toBeInstanceOf(Response)
+    expect(response.status).toBe(503)
   })
 
   it('ignores non-GET requests', () => {
