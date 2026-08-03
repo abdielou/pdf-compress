@@ -43,8 +43,14 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
 
   container.appendChild(progressContainer)
 
+  interface FileRow {
+    root: HTMLElement
+    nameEl: HTMLElement
+    metaEl: HTMLElement
+  }
+
   let names: string[] = []
-  let rows: HTMLElement[] = []
+  let rows: FileRow[] = []
   // Per-file progress in [0, 1]; the bar shows the average, so it moves
   // smoothly during long single-file runs and stays monotonic when
   // concurrent files report out of order
@@ -56,9 +62,40 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
   // in-flight files approach (but never reach) full until they complete
   const EXPECTED_ITERATIONS = 6
 
-  function setRow(row: HTMLElement, state: 'queued' | 'active' | 'success' | 'error', text: string): void {
-    row.className = `progress-file-row progress-file-row--${state}`
-    row.textContent = text
+  type RowState = 'queued' | 'active' | 'success' | 'error'
+
+  function makeBadge(kind: string, text: string): HTMLElement {
+    const badge = document.createElement('span')
+    badge.className = `badge badge--${kind}`
+    badge.textContent = text
+    return badge
+  }
+
+  function makeRow(name: string, state: RowState, meta: string): FileRow {
+    const root = document.createElement('div')
+    root.className = `progress-file-row progress-file-row--${state}`
+
+    const main = document.createElement('div')
+    main.className = 'progress-file-row__main'
+
+    const nameEl = document.createElement('span')
+    nameEl.className = 'progress-file-row__name'
+    nameEl.textContent = name
+    nameEl.title = name
+
+    const metaEl = document.createElement('span')
+    metaEl.className = 'progress-file-row__meta'
+    metaEl.textContent = meta
+
+    main.appendChild(nameEl)
+    main.appendChild(metaEl)
+    root.appendChild(main)
+    filesEl.appendChild(root)
+    return { root, nameEl, metaEl }
+  }
+
+  function setState(row: FileRow, state: RowState): void {
+    row.root.className = `progress-file-row progress-file-row--${state}`
   }
 
   function renderBar(): void {
@@ -88,18 +125,14 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
       fillEl.style.transition = ''
     })
     filesEl.textContent = ''
-    rows = names.map((name) => {
-      const row = document.createElement('div')
-      setRow(row, 'queued', `${name}: queued`)
-      filesEl.appendChild(row)
-      return row
-    })
+    rows = names.map((name) => makeRow(name, 'queued', 'Queued'))
   }
 
   function updateIteration(fileIndex: number, iteration: number, dpi: number, size: number): void {
     const row = rows[fileIndex]
     if (!row) return
-    setRow(row, 'active', `${names[fileIndex]}: attempt ${iteration} at ${dpi} DPI (${formatSize(size)})`)
+    setState(row, 'active')
+    row.metaEl.textContent = `Attempt ${iteration} · ${dpi} DPI · ${formatSize(size)}`
     fractions[fileIndex] = Math.max(
       fractions[fileIndex],
       Math.min(0.9, iteration / EXPECTED_ITERATIONS)
@@ -109,7 +142,10 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
 
   function showFileComplete(fileIndex: number): void {
     const row = rows[fileIndex]
-    if (row) setRow(row, 'success', `✓ ${names[fileIndex]}`)
+    if (row) {
+      setState(row, 'success')
+      row.metaEl.textContent = 'Complete'
+    }
     fileDone(fileIndex)
   }
 
@@ -117,29 +153,30 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     const row = rows[result.fileIndex]
     if (!row) return
 
-    const state = result.error ? 'error' : 'success'
-    row.className = `progress-file-row progress-file-row--${state}`
-    row.textContent = ''
-
-    const info = document.createElement('span')
-    info.className = 'progress-file-row__info'
+    setState(row, result.error ? 'error' : 'success')
+    row.metaEl.textContent = ''
 
     if (result.error) {
-      info.textContent = `${result.fileName}: Compression failed: ${result.error}`
+      row.metaEl.textContent = `Compression failed: ${result.error}`
     } else if (result.skipped) {
-      info.textContent = `${result.fileName}: ${formatSize(result.originalSize)} (already under target)`
+      const sizes = document.createElement('span')
+      sizes.textContent = formatSize(result.originalSize)
+      row.metaEl.appendChild(sizes)
+      row.metaEl.appendChild(makeBadge('muted', 'already under target'))
     } else {
       const saved = Math.round((1 - result.compressedSize / result.originalSize) * 100)
-      let text = `${result.fileName}: ${formatSize(result.originalSize)} → ` +
-        `${formatSize(result.compressedSize)} (${saved}% smaller)`
-      if (result.lossless) text += ' (lossless)'
-      if (!result.metTarget) {
-        text += ' (could not reach target, smallest possible shown)'
-        row.classList.add('progress-file-row--warning')
+      const sizes = document.createElement('span')
+      sizes.textContent = `${formatSize(result.originalSize)} → ${formatSize(result.compressedSize)}`
+      row.metaEl.appendChild(sizes)
+      row.metaEl.appendChild(makeBadge('saving', `${saved}% smaller`))
+      if (result.lossless) {
+        row.metaEl.appendChild(makeBadge('lossless', 'lossless'))
       }
-      info.textContent = text
+      if (!result.metTarget) {
+        row.root.classList.add('progress-file-row--warning')
+        row.metaEl.appendChild(makeBadge('warning', 'target not reached, smallest possible'))
+      }
     }
-    row.appendChild(info)
 
     if (!result.error && result.compressedSize > 0) {
       const downloadBtn = document.createElement('button')
@@ -147,7 +184,7 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
       downloadBtn.textContent = 'Download'
       downloadBtn.type = 'button'
       downloadBtn.addEventListener('click', () => downloadResult(result))
-      row.appendChild(downloadBtn)
+      row.root.appendChild(downloadBtn)
     }
 
     fileDone(result.fileIndex)
@@ -156,14 +193,13 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
   function showFileError(fileIndex: number, fileName: string, message: string): void {
     const row = rows[fileIndex]
     if (row) {
-      setRow(row, 'error', `${names[fileIndex]}: ${message}`)
+      setState(row, 'error')
+      row.metaEl.textContent = message
       fileDone(fileIndex)
       return
     }
     // No matching row (e.g. engine-level failure before a run starts)
-    const orphan = document.createElement('div')
-    setRow(orphan, 'error', `${fileName}: ${message}`)
-    filesEl.appendChild(orphan)
+    makeRow(fileName, 'error', message)
   }
 
   function showLoading(message: string): void {

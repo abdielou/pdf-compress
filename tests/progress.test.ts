@@ -35,12 +35,44 @@ describe('ProgressUI: rows become result rows (single list)', () => {
     expect((container.querySelector('.progress-fill') as HTMLElement).style.width).toBe('100%')
   })
 
-  it('marks lossless results in the row', () => {
+  it('rows have a structured layout: name element and meta line', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['a-very-long-file-name.pdf'])
+
+    const name = container.querySelector('.progress-file-row__name') as HTMLElement
+    expect(name).not.toBeNull()
+    expect(name.textContent).toBe('a-very-long-file-name.pdf')
+    // Tooltip for truncated names
+    expect(name.title).toBe('a-very-long-file-name.pdf')
+    expect(container.querySelector('.progress-file-row__meta')).not.toBeNull()
+
+    // The name stays put through every state change
+    ui.updateIteration(0, 1, 300, 5_000_000)
+    expect(container.querySelector('.progress-file-row__name')!.textContent).toBe('a-very-long-file-name.pdf')
+    ui.showFileResult(makeResult({ fileName: 'a-very-long-file-name.pdf' }))
+    expect(container.querySelector('.progress-file-row__name')!.textContent).toBe('a-very-long-file-name.pdf')
+  })
+
+  it('savings render as a badge, not inline prose', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['doc.pdf'])
+    ui.showFileResult(makeResult({}))
+
+    const badge = container.querySelector('.badge--saving')
+    expect(badge).not.toBeNull()
+    expect(badge!.textContent).toContain('% smaller')
+  })
+
+  it('marks lossless results with a badge', () => {
     const container = document.createElement('div')
     const ui = createProgressUI(container)
     ui.startRun(['doc.pdf'])
     ui.showFileResult(makeResult({ lossless: true }))
-    expect(container.querySelector('.progress-file-row')!.textContent).toContain('(lossless)')
+    const badge = container.querySelector('.badge--lossless')
+    expect(badge).not.toBeNull()
+    expect(badge!.textContent).toContain('lossless')
   })
 
   it('skipped files show already-under-target and stay downloadable', () => {
@@ -106,14 +138,14 @@ describe('ProgressUI: per-file rows', () => {
     ui.updateIteration(1, 2, 150, 2_000_000)
 
     const rows = container.querySelectorAll('.progress-file-row')
-    expect(rows[1].textContent).toContain('attempt 2')
+    expect(rows[1].textContent).toContain('Attempt 2')
     expect(rows[1].textContent).toContain('150 DPI')
-    expect(rows[0].textContent).not.toContain('attempt')
+    expect(rows[0].textContent).not.toContain('Attempt')
 
     // A second concurrent file reports without clobbering the first
     ui.updateIteration(0, 1, 300, 5_000_000)
-    expect(rows[0].textContent).toContain('attempt 1')
-    expect(rows[1].textContent).toContain('attempt 2')
+    expect(rows[0].textContent).toContain('Attempt 1')
+    expect(rows[1].textContent).toContain('Attempt 2')
   })
 
   it('the bar advances during a single file run, not only at completion', () => {
