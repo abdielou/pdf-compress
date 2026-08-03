@@ -95,3 +95,39 @@ describe('Ghostscript args: deterministic size-vs-DPI', () => {
     expect(args).toContain('-dGrayImageFilter=/DCTEncode')
   })
 })
+
+describe('Image encoding parameter', () => {
+  function argsOfLastCall(gs: ReturnType<typeof createMockGs>): string[] {
+    return gs.callMain.mock.calls[gs.callMain.mock.calls.length - 1][0] as string[]
+  }
+
+  it('default encode is DCT at QFactor 0.4 via distillerparams', () => {
+    const gs = createMockGs(() => 5000)
+    gs.FS.writeFile('/input.pdf', new Uint8Array(10))
+    compressAtDpi(gs, 150)
+    const args = argsOfLastCall(gs)
+    expect(args).toContain('-dColorImageFilter=/DCTEncode')
+    const dict = args[args.indexOf('-c') + 1]
+    expect(dict).toContain('/QFactor 0.4')
+    expect(args[args.indexOf('-c') + 2]).toBe('-f')
+  })
+
+  it('dct encode with explicit qFactor lands in the distiller dict', () => {
+    const gs = createMockGs(() => 5000)
+    gs.FS.writeFile('/input.pdf', new Uint8Array(10))
+    compressAtDpi(gs, 300, { filter: 'dct', qFactor: 0.06 })
+    const args = argsOfLastCall(gs)
+    const dict = args[args.indexOf('-c') + 1]
+    expect(dict).toContain('/QFactor 0.06')
+  })
+
+  it('flate encode is lossless: FlateEncode filters, no quality dict', () => {
+    const gs = createMockGs(() => 5000)
+    gs.FS.writeFile('/input.pdf', new Uint8Array(10))
+    compressAtDpi(gs, 300, { filter: 'flate' })
+    const args = argsOfLastCall(gs)
+    expect(args).toContain('-dColorImageFilter=/FlateEncode')
+    expect(args).toContain('-dGrayImageFilter=/FlateEncode')
+    expect(args).not.toContain('-c')
+  })
+})

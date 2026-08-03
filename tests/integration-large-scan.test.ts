@@ -61,9 +61,32 @@ describe('Real end-to-end: large scan with 4MB target', () => {
     )
     expect(results[0].error).toBeUndefined()
     expect(results[0].metTarget).toBe(true)
+    // Incompressible noise cannot fit losslessly: the DPI search must run
+    expect(results[0].lossless).toBeFalsy()
     expect(results[0].compressedSize).toBeLessThanOrEqual(4_000_000)
     // The bug returned 0.26MB here. Require at least half the budget used:
     // the discrete DPI grid can step over the 90% band, but not this far.
     expect(results[0].compressedSize).toBeGreaterThanOrEqual(2_000_000)
+  })
+
+  it('compressible graphics fit losslessly at full resolution', { timeout: 300_000 }, async () => {
+    // Models a huge raw synthetic image (the CustomerAnalytics case):
+    // lossless deflate beats every JPEG setting, so quality-first wins
+    const pdf = buildNoisePdf(5, 1700, 2200, 'compressible')
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'graphics.pdf', buffer: pdf.buffer.slice(0) as ArrayBuffer }],
+      { mode: 'size', maxBytes: 4_000_000 }
+    )
+
+    console.log(
+      `graphics e2e: ${(pdf.length / 1024 / 1024).toFixed(1)} MB -> ` +
+      `${(results[0].compressedSize / 1024 / 1024).toFixed(2)} MB lossless=${results[0].lossless}`
+    )
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].lossless).toBe(true)
+    expect(results[0].compressedSize).toBeLessThanOrEqual(4_000_000)
   })
 })

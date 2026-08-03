@@ -65,6 +65,9 @@ export function renderResults(container: HTMLElement, results: CompressionResult
     } else {
       const saved = Math.round((1 - r.compressedSize / r.originalSize) * 100)
       sizes.textContent = `${formatSize(r.originalSize)} → ${formatSize(r.compressedSize)} (${saved}% smaller)`
+      if (r.lossless) {
+        sizes.textContent += ' (lossless)'
+      }
       if (!r.metTarget) {
         sizes.textContent += ' (could not reach target, smallest possible shown)'
         sizes.classList.add('results__sizes--warning')

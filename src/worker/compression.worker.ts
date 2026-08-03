@@ -32,7 +32,7 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
         // Write input, compress, clean up
         gs.FS.writeFile('/input.pdf', input)
         try {
-          const result = compressAtDpi(gs, cmd.dpi)
+          const result = compressAtDpi(gs, cmd.dpi, cmd.encode)
           if (result) {
             const buffer = result.bytes.buffer.slice(
               result.bytes.byteOffset,

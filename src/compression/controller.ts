@@ -2,6 +2,7 @@ import type {
   CompressionTarget,
   CompressionResult,
   WorkerEvent,
+  ImageEncode,
 } from './types'
 import { createCompressionWorker, sendCommand } from './worker-client'
 
@@ -15,6 +16,14 @@ const MAX_REFINEMENTS = 8
 // repeatedly when the curve's local exponent varies; after this many
 // attempts the loop switches to plain bisection for guaranteed progress
 const INTERPOLATION_TRIES = 2
+
+// JPEG quality ladder: lower QFactor = higher quality = larger output.
+// HQ_QFACTOR is near-lossless; POLISH_QFACTORS upgrade quality when the
+// DPI search leaves most of the size budget unused.
+const HQ_QFACTOR = 0.06
+const POLISH_QFACTORS = [0.15, 0.06]
+const LOSSLESS: ImageEncode = { filter: 'flate' }
+const HIGH_QUALITY: ImageEncode = { filter: 'dct', qFactor: HQ_QFACTOR }
 
 function getPoolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2
@@ -67,7 +76,8 @@ function compressAtDpi(
   worker: Worker,
   fileIndex: number,
   buffer: ArrayBuffer,
-  dpi: number
+  dpi: number,
+  encode?: ImageEncode
 ): Promise<Probe | null> {
   return new Promise((resolve) => {
     const cleanup = () => {
@@ -99,6 +109,7 @@ function compressAtDpi(
       fileIndex,
       buffer: clone,
       dpi,
+      encode,
     }, [clone])
   })
 }
@@ -277,9 +288,82 @@ export class CompressionController {
       track(probe)
     }
 
-    // Step 1: probes at 300 and 72 DPI. Run them in parallel only when a
-    // second worker is idle; otherwise run sequentially on our own worker
-    // so queued files are not starved.
+    // Stage C (shared exit): when the DPI search leaves most of the size
+    // budget unused, spend it on higher JPEG quality at the found DPI.
+    const finish = async (): Promise<CompressionResult> => {
+      if (best && best.size < targetBytes * GOOD_ENOUGH_RATIO) {
+        const anchorDpi = best.dpi
+        for (const qFactor of POLISH_QFACTORS) {
+          // Known overshoot: the stage-A probe already ran this quality at MAX_DPI
+          if (anchorDpi === MAX_DPI && qFactor === HQ_QFACTOR) continue
+          const probe = await compressAtDpi(
+            worker, fileIndex, file.buffer, anchorDpi, { filter: 'dct', qFactor }
+          )
+          report(probe, anchorDpi)
+          if (!probe || probe.size > targetBytes) break
+          // Same DPI, higher quality, still fits: strictly better
+          best = probe
+          if (probe.size >= targetBytes * GOOD_ENOUGH_RATIO) break
+        }
+      }
+      return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
+    }
+
+    // Stage A: quality-first probes at maximum DPI. If the file fits the
+    // target losslessly (or at near-lossless JPEG), that IS the best
+    // possible output. Handles files whose size is insensitive to DPI
+    // (for example a single low-effective-DPI raw image).
+    let flateProbe: Probe | null
+    let hqProbe: Probe | null = null
+
+    const secondA = this.tryAcquire()
+    if (secondA) {
+      try {
+        ;[flateProbe, hqProbe] = await Promise.all([
+          compressAtDpi(worker, fileIndex, file.buffer, MAX_DPI, LOSSLESS),
+          compressAtDpi(secondA, fileIndex, file.buffer, MAX_DPI, HIGH_QUALITY),
+        ])
+      } finally {
+        this.release(secondA)
+      }
+      report(flateProbe, MAX_DPI)
+      report(hqProbe, MAX_DPI)
+    } else {
+      flateProbe = await compressAtDpi(worker, fileIndex, file.buffer, MAX_DPI, LOSSLESS)
+      report(flateProbe, MAX_DPI)
+      if (!flateProbe || flateProbe.size > targetBytes) {
+        hqProbe = await compressAtDpi(worker, fileIndex, file.buffer, MAX_DPI, HIGH_QUALITY)
+        report(hqProbe, MAX_DPI)
+      }
+    }
+
+    if (flateProbe && flateProbe.size <= targetBytes) {
+      return {
+        fileIndex,
+        fileName: file.name,
+        originalSize,
+        compressedSize: flateProbe.size,
+        buffer: flateProbe.buffer,
+        skipped: false,
+        metTarget: true,
+        lossless: true,
+      }
+    }
+    if (hqProbe && hqProbe.size <= targetBytes) {
+      return {
+        fileIndex,
+        fileName: file.name,
+        originalSize,
+        compressedSize: hqProbe.size,
+        buffer: hqProbe.buffer,
+        skipped: false,
+        metTarget: true,
+      }
+    }
+
+    // Stage B: probes at 300 and 72 DPI at the search's fixed default
+    // quality. Run them in parallel only when a second worker is idle;
+    // otherwise run sequentially so queued files are not starved.
     let highProbe: Probe | null
     let lowProbe: Probe | null = null
 
@@ -306,7 +390,7 @@ export class CompressionController {
 
     // Early exit: 300 DPI fits
     if (highProbe && highProbe.size <= targetBytes) {
-      return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
+      return finish()
     }
 
     // Even low probe too big — try minimum DPI
@@ -315,7 +399,7 @@ export class CompressionController {
         const minProbe = await compressAtDpi(worker, fileIndex, file.buffer, MIN_DPI)
         report(minProbe, MIN_DPI)
       }
-      return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
+      return finish()
     }
 
     // Step 2: Interpolate and refine until good enough
@@ -359,7 +443,7 @@ export class CompressionController {
       }
     }
 
-    return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
+    return finish()
   }
 
   private buildResult(

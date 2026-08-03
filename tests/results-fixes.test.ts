@@ -74,6 +74,14 @@ describe('Fix 7c: failure is signaled by the error field', () => {
   })
 })
 
+describe('Lossless label', () => {
+  it('marks lossless results', () => {
+    const container = document.createElement('div')
+    renderResults(container, [makeResult({ lossless: true })])
+    expect(container.textContent).toContain('(lossless)')
+  })
+})
+
 describe('Fix 3 UI: unreachable target shows a warning but stays downloadable', () => {
   it('shows a target warning when metTarget is false', () => {
     const container = document.createElement('div')

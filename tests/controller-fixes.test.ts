@@ -11,8 +11,12 @@ import type { CompressionTarget } from '../src/compression/types'
  *  - crash: fire a worker 'error' event instead of responding
  *  - failDpi: respond with a dpi-error event
  */
+type Encode = { filter: 'flate' } | { filter: 'dct'; qFactor: number }
+
 interface FileBehavior {
   sizeForDpi?: (dpi: number) => number
+  /** Quality-aware size model; takes precedence over sizeForDpi */
+  sizeForProbe?: (dpi: number, encode: Encode) => number
   delayMs?: number
   crash?: boolean
   failDpi?: boolean
@@ -89,7 +93,10 @@ async function installMockWorkers(
                 })
                 return
               }
-              const size = b.sizeForDpi!(cmd.dpi)
+              const encode: Encode = cmd.encode ?? { filter: 'dct', qFactor: 0.4 }
+              const size = b.sizeForProbe
+                ? b.sizeForProbe(cmd.dpi, encode)
+                : b.sizeForDpi!(cmd.dpi)
               log.entries.push(`done:${cmd.fileIndex}:${cmd.dpi}`)
               emit('message', {
                 data: {
@@ -351,7 +358,7 @@ describe('Fix 5b: staged readiness (first worker unblocks compression)', () => {
 })
 
 describe('Ported engine behavior: convergence and quality', () => {
-  it('converges in at most 4 Ghostscript calls for a power-law file', async () => {
+  it('converges in at most 6 Ghostscript calls for a power-law file', async () => {
     const behaviors = new Map<number, FileBehavior>([
       [10_000_000, { sizeForDpi: (dpi) => Math.round(100 * dpi * dpi) }],
     ])
@@ -365,7 +372,7 @@ describe('Ported engine behavior: convergence and quality', () => {
     )
 
     const calls = log.entries.filter((e) => e.startsWith('start:0:')).length
-    expect(calls).toBeLessThanOrEqual(4)
+    expect(calls).toBeLessThanOrEqual(6)
     expect(results[0].metTarget).toBe(true)
   })
 
@@ -403,6 +410,87 @@ describe('Ported engine behavior: convergence and quality', () => {
     expect(results[0].compressedSize).toBe(3_000_000)
     const calls = log.entries.filter((e) => e.startsWith('start:0:')).length
     expect(calls).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('Quality-first search: DPI-insensitive files', () => {
+  // Models the user's CustomerAnalytics.pdf: one giant 72-effective-DPI
+  // raw image. DPI does nothing; encoding choice controls the size.
+  // Measured: lossless 0.82MB, DCT qf0.06 2.59MB, qf0.4 1.43MB.
+  const flatFile = (dpi: number, encode: Encode): number => {
+    if (encode.filter === 'flate') return 820_000
+    if (encode.qFactor <= 0.06) return 2_590_000
+    if (encode.qFactor <= 0.15) return 1_940_000
+    return 1_430_000
+  }
+
+  it('returns the lossless result when it fits the target', async () => {
+    const behaviors = new Map<number, FileBehavior>([
+      [70_000_000, { sizeForProbe: flatFile }],
+    ])
+    const { log } = await installMockWorkers(behaviors)
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'analytics.pdf', buffer: new ArrayBuffer(70_000_000) }],
+      SIZE_TARGET
+    )
+
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].lossless).toBe(true)
+    expect(results[0].compressedSize).toBe(820_000)
+    // Quality probes resolve it without any DPI search
+    const calls = log.entries.filter((e) => e.startsWith('start:0:')).length
+    expect(calls).toBeLessThanOrEqual(2)
+  })
+
+  it('falls back to maximum-quality JPEG when lossless overshoots', async () => {
+    const behaviors = new Map<number, FileBehavior>([
+      [70_000_000, {
+        sizeForProbe: (dpi, encode) =>
+          encode.filter === 'flate' ? 60_000_000 : flatFile(dpi, encode),
+      }],
+    ])
+    await installMockWorkers(behaviors)
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'photo.pdf', buffer: new ArrayBuffer(70_000_000) }],
+      SIZE_TARGET
+    )
+
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].lossless).toBeFalsy()
+    expect(results[0].compressedSize).toBe(2_590_000)
+  })
+
+  it('polishes quality upward when the DPI search leaves budget unused', async () => {
+    // DPI curve is a step: >=100 DPI overshoots, below it flat at 1MB.
+    // Target 2.5MB: DPI search can only reach 1MB (40% of budget);
+    // the quality polish at the found DPI recovers most of the rest.
+    const behaviors = new Map<number, FileBehavior>([
+      [10_000_000, {
+        sizeForProbe: (dpi, encode) => {
+          if (encode.filter === 'flate') return 60_000_000
+          if (encode.qFactor <= 0.06) return dpi >= 100 ? 8_000_000 : 2_400_000
+          if (encode.qFactor <= 0.15) return dpi >= 100 ? 6_000_000 : 1_800_000
+          return dpi >= 100 ? 5_000_000 : 1_000_000
+        },
+      }],
+    ])
+    await installMockWorkers(behaviors)
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'step.pdf', buffer: new ArrayBuffer(10_000_000) }],
+      { mode: 'size', maxBytes: 2_500_000 }
+    )
+
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].compressedSize).toBe(2_400_000)
   })
 })
 

@@ -1,7 +1,12 @@
 // Shared test fixture: scan-like PDF made of noise images.
 // Effective image DPI is 200 (1700x2200 drawn on a letter page).
 
-export function buildNoisePdf(pages: number, W: number, H: number): Uint8Array {
+export function buildNoisePdf(
+  pages: number,
+  W: number,
+  H: number,
+  pattern: 'noise' | 'compressible' = 'noise'
+): Uint8Array {
   const enc = (s: string) => Buffer.from(s, 'latin1')
   const chunks: Buffer[] = []
   const offsets: number[] = []
@@ -31,9 +36,19 @@ export function buildNoisePdf(pages: number, W: number, H: number): Uint8Array {
       `/Contents ${contentObj} 0 R >>\nendobj\n`
     ))
     const imgData = Buffer.alloc(W * H * 3)
-    for (let i = 0; i < imgData.length; i++) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      imgData[i] = seed & 0xff
+    if (pattern === 'noise') {
+      // Math.imul keeps the LCG in exact 32-bit arithmetic. A plain
+      // multiply exceeds 2^53, loses the low bits, and degenerates into
+      // a repeating (highly compressible) sequence.
+      for (let i = 0; i < imgData.length; i++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) | 0
+        imgData[i] = (seed >>> 24) & 0xff
+      }
+    } else {
+      // Smooth gradient: models synthetic graphics that deflate crushes
+      for (let i = 0; i < imgData.length; i++) {
+        imgData[i] = ((i / 3) % 251) & 0xff
+      }
     }
     push(Buffer.concat([
       enc(

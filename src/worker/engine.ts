@@ -20,9 +20,13 @@ interface GsModule {
 const INPUT_PATH = '/input.pdf'
 const OUTPUT_PATH = '/output.pdf'
 
-/** Build Ghostscript arguments matching compress.sh exactly. */
-function buildGsArgs(dpi: number): string[] {
-  return [
+import type { ImageEncode } from '../compression/types'
+
+const DEFAULT_ENCODE: ImageEncode = { filter: 'dct', qFactor: 0.4 }
+
+/** Build Ghostscript arguments for one pass at the given DPI and encoding. */
+function buildGsArgs(dpi: number, encode: ImageEncode): string[] {
+  const args = [
     '-sDEVICE=pdfwrite',
     '-dCompatibilityLevel=1.4',
     '-dNOPAUSE',
@@ -42,28 +46,46 @@ function buildGsArgs(dpi: number): string[] {
     `-dMonoImageResolution=${dpi}`,
     '-dMonoImageDownsampleThreshold=1.0',
     // AutoFilter picks JPEG quality per image heuristically, which makes
-    // output size erratic and non-monotonic in DPI. Fixed DCT encoding
-    // keeps the size-vs-DPI curve monotonic so the search can converge.
+    // output size erratic and non-monotonic in DPI. Explicit filters keep
+    // both search knobs (DPI, quality) deterministic and monotonic.
     '-dAutoFilterColorImages=false',
     '-dAutoFilterGrayImages=false',
+  ]
+
+  if (encode.filter === 'flate') {
+    args.push(
+      '-dColorImageFilter=/FlateEncode',
+      '-dGrayImageFilter=/FlateEncode',
+      `-sOutputFile=${OUTPUT_PATH}`,
+      INPUT_PATH,
+    )
+    return args
+  }
+
+  const q = encode.qFactor
+  const imageDict = `<< /QFactor ${q} /Blend 1 /HSamples [1 1 1 1] /VSamples [1 1 1 1] >>`
+  args.push(
     '-dColorImageFilter=/DCTEncode',
     '-dGrayImageFilter=/DCTEncode',
     `-sOutputFile=${OUTPUT_PATH}`,
-    INPUT_PATH,
-  ]
+    '-c', `<< /ColorImageDict ${imageDict} /GrayImageDict ${imageDict} >> setdistillerparams`,
+    '-f', INPUT_PATH,
+  )
+  return args
 }
 
 /**
- * Compress at a specific DPI. Assumes input is already written to /input.pdf.
- * Cleans up /output.pdf in finally block.
+ * Compress at a specific DPI and encoding. Assumes input is already written
+ * to /input.pdf. Cleans up /output.pdf in finally block.
  * Returns { bytes, size } on success, null if callMain returns non-zero.
  */
 export function compressAtDpi(
   gs: GsModule,
-  dpi: number
+  dpi: number,
+  encode: ImageEncode = DEFAULT_ENCODE
 ): { bytes: Uint8Array; size: number } | null {
   try {
-    const exitCode = gs.callMain(buildGsArgs(dpi))
+    const exitCode = gs.callMain(buildGsArgs(dpi, encode))
     if (exitCode !== 0) {
       return null
     }
