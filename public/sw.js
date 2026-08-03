@@ -34,8 +34,13 @@ self.addEventListener('fetch', (event) => {
         }
         return response
       }).catch(() => {
-        // Network failed, cached will be returned below if available
-        return cached
+        // Network failed: serve cache, or a real offline response
+        // (respondWith must never resolve to undefined)
+        return cached || new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain' },
+        })
       })
 
       // Return cached immediately, update in background (stale-while-revalidate)

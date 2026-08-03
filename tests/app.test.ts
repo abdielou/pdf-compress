@@ -7,6 +7,7 @@ vi.mock('../src/main', () => ({
   controller: {
     isReady: false,
     waitUntilReady: vi.fn(),
+    warmup: vi.fn(),
   },
 }))
 
@@ -92,7 +93,63 @@ describe('App Orchestrator', () => {
     vi.resetModules()
   })
 
-  it('error per file: shows per-file error when compressedSize is 0 and not skipped', async () => {
+  it('warmup: starts the compression engine when files are selected', async () => {
+    const { controller } = await import('../src/main')
+    const mockController = controller as unknown as { warmup: ReturnType<typeof vi.fn> }
+
+    const { initApp } = await import('../src/ui/app')
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    initApp(root)
+
+    const { createDropZone } = await import('../src/ui/drop-zone')
+    const dropZoneCall = (createDropZone as ReturnType<typeof vi.fn>).mock.calls[0]
+    const onFilesCb = dropZoneCall[1] as (files: File[]) => void
+
+    const pdfFile = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'test.pdf', { type: 'application/pdf' })
+    onFilesCb([pdfFile])
+
+    expect(mockController.warmup).toHaveBeenCalled()
+
+    document.body.removeChild(root)
+    vi.resetModules()
+  })
+
+  it('shows compressing status immediately, before the first probe returns', async () => {
+    const { controller, compressFiles } = await import('../src/main')
+    const mockController = controller as { isReady: boolean }
+    mockController.isReady = true
+
+    // compressFiles never resolves: simulates a long first Ghostscript pass
+    ;(compressFiles as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}))
+
+    const { initApp } = await import('../src/ui/app')
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+
+    initApp(root)
+
+    const { createDropZone } = await import('../src/ui/drop-zone')
+    const dropZoneCall = (createDropZone as ReturnType<typeof vi.fn>).mock.calls[0]
+    const onFilesCb = dropZoneCall[1] as (files: File[]) => void
+
+    const pdfFile = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'slow.pdf', { type: 'application/pdf' })
+    onFilesCb([pdfFile])
+
+    const compressBtn = root.querySelector('.compress-btn') as HTMLButtonElement
+    compressBtn.click()
+    await new Promise((r) => setTimeout(r, 10))
+
+    const status = root.querySelector('.progress-status')
+    expect(status?.textContent?.toLowerCase()).toContain('compressing')
+    expect(status?.textContent).toContain('slow.pdf')
+
+    document.body.removeChild(root)
+    vi.resetModules()
+  })
+
+  it('error per file: shows per-file error when the result carries an error', async () => {
     const { controller, compressFiles } = await import('../src/main')
     const mockController = controller as { isReady: boolean; waitUntilReady: ReturnType<typeof vi.fn> }
 
@@ -108,6 +165,8 @@ describe('App Orchestrator', () => {
         compressedSize: 0,
         buffer: new ArrayBuffer(0),
         skipped: false,
+        metTarget: false,
+        error: 'Ghostscript failed',
       },
     ])
 

@@ -2,14 +2,70 @@ import { test, expect } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
-const PDF_PATH = path.resolve(
-  process.cwd(),
-  'Luis Ramos Aug 2024 statement.pdf'
-)
-const PDF_PATH_2 = path.resolve(
-  process.cwd(),
-  'Luis Ramos Toledo Jan 2025 Statement.pdf'
-)
+/**
+ * Generate a synthetic ~5 MB PDF fixture: one page with a large noise image.
+ * Above the default 4 MB target, so the compress path always runs.
+ * Deterministic (LCG noise), self-contained, and safe to commit nothing.
+ */
+function buildNoisePdf(): Buffer {
+  const W = 1300
+  const H = 1300
+  const imgData = Buffer.alloc(W * H * 3)
+  let seed = 42
+  for (let i = 0; i < imgData.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    imgData[i] = seed & 0xff
+  }
+  const content = Buffer.from('q 612 0 0 792 0 0 cm /Im0 Do Q')
+
+  const header = Buffer.from('%PDF-1.4\n')
+  const chunks: Buffer[] = [header]
+  const offsets: number[] = []
+  let pos = header.length
+  const push = (b: Buffer) => {
+    offsets.push(pos)
+    chunks.push(b)
+    pos += b.length
+  }
+
+  push(Buffer.from('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'))
+  push(Buffer.from('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'))
+  push(Buffer.from(
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+    '/Resources << /XObject << /Im0 4 0 R >> /ProcSet [/PDF /ImageC] >> ' +
+    '/Contents 5 0 R >>\nendobj\n'
+  ))
+  push(Buffer.concat([
+    Buffer.from(
+      `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${W} /Height ${H} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${imgData.length} >>\nstream\n`
+    ),
+    imgData,
+    Buffer.from('\nendstream\nendobj\n'),
+  ]))
+  push(Buffer.concat([
+    Buffer.from(`5 0 obj\n<< /Length ${content.length} >>\nstream\n`),
+    content,
+    Buffer.from('\nendstream\nendobj\n'),
+  ]))
+
+  const xrefPos = pos
+  let xref = 'xref\n0 6\n0000000000 65535 f \n'
+  for (const o of offsets) xref += `${String(o).padStart(10, '0')} 00000 n \n`
+  xref += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`
+  chunks.push(Buffer.from(xref))
+  return Buffer.concat(chunks)
+}
+
+const FIXTURE_DIR = path.resolve(process.cwd(), 'tests', 'e2e', '.generated')
+const PDF_PATH = path.join(FIXTURE_DIR, 'noise-5mb.pdf')
+
+test.beforeAll(() => {
+  if (!fs.existsSync(PDF_PATH)) {
+    fs.mkdirSync(FIXTURE_DIR, { recursive: true })
+    fs.writeFileSync(PDF_PATH, buildNoisePdf())
+  }
+})
 
 test.describe('Phase 2: File Input & Progress UI', () => {
   test.beforeEach(async ({ page }) => {
@@ -91,9 +147,9 @@ test.describe('Phase 2: File Input & Progress UI', () => {
     await expect(bar).toBeVisible()
   })
 
-  test('PRG-04: shows error row when compression fails to meet target', async ({ page }) => {
-    // Use a very aggressive target (1 byte) to force failure/best-effort result
-    // First set size to 0 MB (minimum) to guarantee no file can meet target
+  test('PRG-04: shows a result row when the target cannot be met', async ({ page }) => {
+    // 0 MB target is unreachable: the app returns the smallest achievable
+    // file (metTarget=false) and still renders a per-file row
     const fileInput = page.locator('input[type="file"]')
     await fileInput.setInputFiles(PDF_PATH)
 

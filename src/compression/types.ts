@@ -36,4 +36,8 @@ export interface CompressionResult {
   compressedSize: number
   buffer: ArrayBuffer
   skipped: boolean
+  /** True when the output size is at or under the requested target */
+  metTarget: boolean
+  /** Set when compression produced no output at all */
+  error?: string
 }

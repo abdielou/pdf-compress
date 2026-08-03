@@ -20,47 +20,72 @@ function getPoolSize(): number {
 
 /**
  * Interpolate DPI using power-law model from two data points.
+ * Falls back to linear interpolation when the power law is undefined.
+ * Always returns a finite value clamped to [MIN_DPI, MAX_DPI].
  */
-function interpolateDpi(
+export function interpolateDpi(
   dpi1: number, size1: number,
   dpi2: number, size2: number,
   targetSize: number
 ): number {
+  const clamp = (value: number): number =>
+    Number.isFinite(value)
+      ? Math.round(Math.max(MIN_DPI, Math.min(MAX_DPI, value)))
+      : Math.round((dpi1 + dpi2) / 2)
+
   if (size1 <= 0 || size2 <= 0 || dpi1 <= 0 || dpi2 <= 0 || size1 === size2) {
     const ratio = (targetSize - size1) / (size2 - size1)
-    return Math.round(dpi1 + ratio * (dpi2 - dpi1))
+    return clamp(dpi1 + ratio * (dpi2 - dpi1))
   }
 
   const exp = Math.log(size2 / size1) / Math.log(dpi2 / dpi1)
   if (!isFinite(exp) || exp === 0) {
     const ratio = (targetSize - size1) / (size2 - size1)
-    return Math.round(dpi1 + ratio * (dpi2 - dpi1))
+    return clamp(dpi1 + ratio * (dpi2 - dpi1))
   }
 
   const k = size1 / Math.pow(dpi1, exp)
-  const estimatedDpi = Math.pow(targetSize / k, 1 / exp)
-  return Math.round(Math.max(MIN_DPI, Math.min(MAX_DPI, estimatedDpi)))
+  return clamp(Math.pow(targetSize / k, 1 / exp))
 }
 
-/** Send a compress-at-dpi command and wait for result */
+interface Probe {
+  dpi: number
+  size: number
+  buffer: ArrayBuffer
+}
+
+/**
+ * Send a compress-at-dpi command and wait for the result.
+ * Resolves null on a dpi-error response or a worker-level error event,
+ * so a crashed worker can never leave the promise pending.
+ */
 function compressAtDpi(
   worker: Worker,
   fileIndex: number,
   buffer: ArrayBuffer,
   dpi: number
-): Promise<{ dpi: number; size: number; buffer: ArrayBuffer } | null> {
+): Promise<Probe | null> {
   return new Promise((resolve) => {
-    const handler = (e: MessageEvent<WorkerEvent>) => {
+    const cleanup = () => {
+      worker.removeEventListener('message', onMessage)
+      worker.removeEventListener('error', onError)
+    }
+    const onMessage = (e: MessageEvent<WorkerEvent>) => {
       const event = e.data
       if (event.type === 'dpi-result' && event.fileIndex === fileIndex) {
-        worker.removeEventListener('message', handler)
+        cleanup()
         resolve({ dpi: event.dpi, size: event.size, buffer: event.buffer })
       } else if (event.type === 'dpi-error' && event.fileIndex === fileIndex) {
-        worker.removeEventListener('message', handler)
+        cleanup()
         resolve(null)
       }
     }
-    worker.addEventListener('message', handler)
+    const onError = () => {
+      cleanup()
+      resolve(null)
+    }
+    worker.addEventListener('message', onMessage)
+    worker.addEventListener('error', onError)
     // Clone buffer since Transferable empties the original
     const clone = buffer.slice(0)
     sendCommand(worker, {
@@ -73,42 +98,100 @@ function compressAtDpi(
 }
 
 export class CompressionController {
-  private workers: Worker[]
   private poolSize: number
-  private ready: Promise<void>
+  private workers: Worker[] = []
+  private idle: Worker[] = []
+  private waiters: Array<(w: Worker) => void> = []
+  private started = false
+  private ready: Promise<void> | null = null
   public isReady: boolean = false
 
   constructor() {
     this.poolSize = getPoolSize()
+  }
+
+  /**
+   * Spawn and initialize the worker pool. Called lazily on first use so
+   * loading the page does not pay the Ghostscript WASM cost per worker.
+   *
+   * Readiness is staged: `ready` resolves when the FIRST worker is up, so
+   * compression starts immediately. The remaining workers join the pool as
+   * their WASM finishes loading. It only rejects when every worker fails.
+   */
+  private start(): Promise<void> {
+    if (this.started) return this.ready!
+    this.started = true
+
     this.workers = Array.from({ length: this.poolSize }, () => createCompressionWorker())
 
-    // Init all workers and wait for all to be ready
-    this.ready = Promise.all(
-      this.workers.map((w) =>
-        new Promise<void>((resolve, reject) => {
-          const handler = (e: MessageEvent<WorkerEvent>) => {
-            if (e.data.type === 'ready') {
-              w.removeEventListener('message', handler)
-              resolve()
-            } else if (e.data.type === 'dpi-error' && e.data.fileIndex === -1) {
-              w.removeEventListener('message', handler)
-              reject(new Error(e.data.error))
-            }
-          }
-          w.addEventListener('message', handler)
-          w.addEventListener('error', (err) => {
-            reject(new Error(`Worker error: ${err.message}`))
-          })
-          sendCommand(w, { type: 'init' })
-        })
-      )
-    ).then(() => {
-      this.isReady = true
+    const inits = this.workers.map((w) =>
+      this.initWorker(w).then(() => {
+        // Worker is live: hand it to a queued task or park it as idle
+        this.release(w)
+      })
+    )
+    // Individual failures are reported through Promise.any below;
+    // observe them here so they never surface as unhandled rejections
+    for (const p of inits) p.catch(() => {})
+
+    this.ready = Promise.any(inits).then(
+      () => {
+        this.isReady = true
+      },
+      (err: unknown) => {
+        const first = err instanceof AggregateError ? err.errors[0] : err
+        throw first instanceof Error ? first : new Error(String(first))
+      }
+    )
+
+    return this.ready
+  }
+
+  private initWorker(w: Worker): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const handler = (e: MessageEvent<WorkerEvent>) => {
+        if (e.data.type === 'ready') {
+          w.removeEventListener('message', handler)
+          resolve()
+        } else if (e.data.type === 'dpi-error' && e.data.fileIndex === -1) {
+          w.removeEventListener('message', handler)
+          reject(new Error(e.data.error))
+        }
+      }
+      w.addEventListener('message', handler)
+      w.addEventListener('error', (err) => {
+        reject(new Error(`Worker error: ${(err as ErrorEvent).message}`))
+      })
+      sendCommand(w, { type: 'init' })
     })
   }
 
+  /** Start loading the engine in the background (e.g. when files are selected). */
+  public warmup(): void {
+    // Swallow the rejection here; callers of waitUntilReady/compressFiles still see it
+    void this.start().catch(() => {})
+  }
+
   public waitUntilReady(): Promise<void> {
-    return this.ready
+    return this.start()
+  }
+
+  // --- Worker pool ---
+
+  private acquire(): Promise<Worker> {
+    const w = this.idle.pop()
+    if (w) return Promise.resolve(w)
+    return new Promise((resolve) => this.waiters.push(resolve))
+  }
+
+  private tryAcquire(): Worker | null {
+    return this.idle.pop() ?? null
+  }
+
+  private release(w: Worker): void {
+    const waiter = this.waiters.shift()
+    if (waiter) waiter(w)
+    else this.idle.push(w)
   }
 
   async compressFiles(
@@ -121,18 +204,14 @@ export class CompressionController {
       size: number
     ) => void
   ): Promise<CompressionResult[]> {
-    await this.ready
+    await this.start()
 
     const results: CompressionResult[] = new Array(files.length)
-    const pending: Promise<void>[] = []
 
-    // Process files in batches using worker pool
-    for (let i = 0; i < files.length; i += this.poolSize) {
-      const batch: Promise<void>[] = []
-
-      for (let j = 0; j < this.poolSize && i + j < files.length; j++) {
-        const fileIdx = i + j
-        const file = files[fileIdx]
+    // Queue scheduling: every file task competes for workers, so a slow file
+    // never blocks the files behind it (no fixed batches).
+    await Promise.all(
+      files.map(async (file, fileIdx) => {
         const originalSize = file.buffer.byteLength
 
         const targetBytes =
@@ -140,7 +219,6 @@ export class CompressionController {
             ? target.maxBytes
             : Math.floor(originalSize * (1 - target.reductionPct / 100))
 
-        // Skip check
         if (originalSize <= targetBytes) {
           results[fileIdx] = {
             fileIndex: fileIdx,
@@ -149,82 +227,89 @@ export class CompressionController {
             compressedSize: originalSize,
             buffer: file.buffer,
             skipped: true,
+            metTarget: true,
           }
-          continue
+          return
         }
 
-        // Assign a primary worker for this file
-        const primaryWorker = this.workers[j]
-        const secondaryWorker = this.workers[(j + 1) % this.poolSize]
-
-        batch.push(
-          this.compressFileWithParallelProbes(
-            file, fileIdx, targetBytes, primaryWorker, secondaryWorker, onProgress
-          ).then((result) => {
-            results[fileIdx] = result
-          })
-        )
-      }
-
-      await Promise.all(batch)
-    }
+        const worker = await this.acquire()
+        try {
+          results[fileIdx] = await this.compressFile(
+            file, fileIdx, targetBytes, worker, onProgress
+          )
+        } finally {
+          this.release(worker)
+        }
+      })
+    )
 
     return results
   }
 
-  private async compressFileWithParallelProbes(
+  private async compressFile(
     file: { name: string; buffer: ArrayBuffer },
     fileIndex: number,
     targetBytes: number,
-    workerA: Worker,
-    workerB: Worker,
+    worker: Worker,
     onProgress?: (fileIndex: number, iteration: number, dpi: number, size: number) => void
   ): Promise<CompressionResult> {
     const originalSize = file.buffer.byteLength
     let iteration = 0
-    let bestResult: { size: number; buffer: ArrayBuffer } | null = null
+    let best: Probe | null = null      // Largest result that fits the target
+    let smallest: Probe | null = null  // Smallest result overall (fallback)
 
-    const trackBest = (result: { size: number; buffer: ArrayBuffer } | null) => {
-      if (result && result.size <= targetBytes) {
-        if (!bestResult || result.size > bestResult.size) {
-          bestResult = result
-        }
+    const track = (result: Probe | null) => {
+      if (!result) return
+      if (!smallest || result.size < smallest.size) smallest = result
+      if (result.size <= targetBytes && (!best || result.size > best.size)) {
+        best = result
       }
     }
-
-    // Step 1: Parallel probes — DPI 300 and DPI 72 simultaneously
-    const [highProbe, lowProbe] = await Promise.all([
-      compressAtDpi(workerA, fileIndex, file.buffer, MAX_DPI),
-      compressAtDpi(workerB, fileIndex, file.buffer, LOW_PROBE_DPI),
-    ])
-
-    iteration++
-    if (highProbe) {
-      onProgress?.(fileIndex, iteration, MAX_DPI, highProbe.size)
-      trackBest(highProbe)
+    const report = (probe: Probe | null, dpi: number) => {
+      iteration++
+      if (probe) onProgress?.(fileIndex, iteration, dpi, probe.size)
+      track(probe)
     }
-    iteration++
-    if (lowProbe) {
-      onProgress?.(fileIndex, iteration, LOW_PROBE_DPI, lowProbe.size)
-      trackBest(lowProbe)
+
+    // Step 1: probes at 300 and 72 DPI. Run them in parallel only when a
+    // second worker is idle; otherwise run sequentially on our own worker
+    // so queued files are not starved.
+    let highProbe: Probe | null
+    let lowProbe: Probe | null = null
+
+    const second = this.tryAcquire()
+    if (second) {
+      try {
+        ;[highProbe, lowProbe] = await Promise.all([
+          compressAtDpi(worker, fileIndex, file.buffer, MAX_DPI),
+          compressAtDpi(second, fileIndex, file.buffer, LOW_PROBE_DPI),
+        ])
+      } finally {
+        this.release(second)
+      }
+      report(highProbe, MAX_DPI)
+      report(lowProbe, LOW_PROBE_DPI)
+    } else {
+      highProbe = await compressAtDpi(worker, fileIndex, file.buffer, MAX_DPI)
+      report(highProbe, MAX_DPI)
+      if (!highProbe || highProbe.size > targetBytes) {
+        lowProbe = await compressAtDpi(worker, fileIndex, file.buffer, LOW_PROBE_DPI)
+        report(lowProbe, LOW_PROBE_DPI)
+      }
     }
 
     // Early exit: 300 DPI fits
     if (highProbe && highProbe.size <= targetBytes) {
-      return this.buildResult(fileIndex, file.name, originalSize, bestResult!)
+      return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
     }
 
     // Even low probe too big — try minimum DPI
     if (!lowProbe || lowProbe.size > targetBytes) {
-      if (!bestResult) {
-        const minProbe = await compressAtDpi(workerA, fileIndex, file.buffer, MIN_DPI)
-        iteration++
-        if (minProbe) {
-          onProgress?.(fileIndex, iteration, MIN_DPI, minProbe.size)
-          trackBest(minProbe)
-        }
+      if (!best) {
+        const minProbe = await compressAtDpi(worker, fileIndex, file.buffer, MIN_DPI)
+        report(minProbe, MIN_DPI)
       }
-      return this.buildResult(fileIndex, file.name, originalSize, bestResult)
+      return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
     }
 
     // Step 2: Interpolate and refine until good enough
@@ -239,12 +324,9 @@ export class CompressionController {
       // Avoid re-testing a DPI we've already tried
       if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) break
 
-      const probe = await compressAtDpi(workerA, fileIndex, file.buffer, estimatedDpi)
-      iteration++
+      const probe = await compressAtDpi(worker, fileIndex, file.buffer, estimatedDpi)
+      report(probe, estimatedDpi)
       if (!probe) break
-
-      onProgress?.(fileIndex, iteration, estimatedDpi, probe.size)
-      trackBest(probe)
 
       // Good enough — within 90% of target
       if (probe.size <= targetBytes && probe.size >= targetBytes * GOOD_ENOUGH_RATIO) {
@@ -253,24 +335,23 @@ export class CompressionController {
 
       // Narrow the search bounds
       if (probe.size > targetBytes) {
-        // Overshot — search lower
         highDpi = estimatedDpi
         highSize = probe.size
       } else {
-        // Undershot — search higher for better quality
         lowDpi = estimatedDpi
         lowSize = probe.size
       }
     }
 
-    return this.buildResult(fileIndex, file.name, originalSize, bestResult)
+    return this.buildResult(fileIndex, file.name, originalSize, best, smallest)
   }
 
   private buildResult(
     fileIndex: number,
     fileName: string,
     originalSize: number,
-    best: { size: number; buffer: ArrayBuffer } | null
+    best: Probe | null,
+    smallest: Probe | null
   ): CompressionResult {
     if (best) {
       return {
@@ -280,6 +361,19 @@ export class CompressionController {
         compressedSize: best.size,
         buffer: best.buffer,
         skipped: false,
+        metTarget: true,
+      }
+    }
+    if (smallest) {
+      // Target unreachable even at minimum DPI: return the smallest we got
+      return {
+        fileIndex,
+        fileName,
+        originalSize,
+        compressedSize: smallest.size,
+        buffer: smallest.buffer,
+        skipped: false,
+        metTarget: false,
       }
     }
     return {
@@ -289,6 +383,8 @@ export class CompressionController {
       compressedSize: 0,
       buffer: new ArrayBuffer(0),
       skipped: false,
+      metTarget: false,
+      error: 'Ghostscript could not process this file',
     }
   }
 }

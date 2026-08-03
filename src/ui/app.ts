@@ -132,6 +132,8 @@ export function initApp(root: HTMLElement): void {
 
   function onFiles(files: File[]): void {
     selectedFiles = files
+    // Start loading the WASM engine while the user configures the target
+    controller.warmup()
     setState('files-selected')
   }
 
@@ -155,7 +157,11 @@ export function initApp(root: HTMLElement): void {
 
     const target = targetConfig.getTarget()
     const totalFiles = selectedFiles.length
-    let lastFileIndex = -1
+
+    // Show status right away: the first Ghostscript pass can take a while
+    // and the first progress event only fires when it completes
+    progressUI.showFileProgress(0, totalFiles, selectedFiles[0].name)
+    let lastFileIndex = 0
 
     try {
       const results = await compressFiles(selectedFiles, target, (fileIndex, iteration, dpi, size) => {
@@ -170,7 +176,7 @@ export function initApp(root: HTMLElement): void {
 
       // Process results
       for (const result of results) {
-        if (result.compressedSize === 0 && !result.skipped) {
+        if (result.error && !result.skipped) {
           // PRG-04: Per-file error
           progressUI.showFileError(result.fileIndex, result.fileName, 'Compression failed')
         } else {
