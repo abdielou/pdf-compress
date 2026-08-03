@@ -41,6 +41,13 @@ function buildGsArgs(dpi: number): string[] {
     '-dMonoImageDownsampleType=/Bicubic',
     `-dMonoImageResolution=${dpi}`,
     '-dMonoImageDownsampleThreshold=1.0',
+    // AutoFilter picks JPEG quality per image heuristically, which makes
+    // output size erratic and non-monotonic in DPI. Fixed DCT encoding
+    // keeps the size-vs-DPI curve monotonic so the search can converge.
+    '-dAutoFilterColorImages=false',
+    '-dAutoFilterGrayImages=false',
+    '-dColorImageFilter=/DCTEncode',
+    '-dGrayImageFilter=/DCTEncode',
     `-sOutputFile=${OUTPUT_PATH}`,
     INPUT_PATH,
   ]

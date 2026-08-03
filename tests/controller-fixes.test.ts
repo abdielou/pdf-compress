@@ -16,6 +16,8 @@ interface FileBehavior {
   delayMs?: number
   crash?: boolean
   failDpi?: boolean
+  /** Probes above this DPI respond with dpi-error (models resource limits) */
+  failAboveDpi?: number
 }
 
 interface HarnessLog {
@@ -75,7 +77,7 @@ async function installMockWorkers(
                 emit('error', { message: 'worker crashed' })
                 return
               }
-              if (b.failDpi) {
+              if (b.failDpi || (b.failAboveDpi !== undefined && cmd.dpi > b.failAboveDpi)) {
                 log.entries.push(`fail:${cmd.fileIndex}`)
                 emit('message', {
                   data: {
@@ -401,6 +403,64 @@ describe('Ported engine behavior: convergence and quality', () => {
     expect(results[0].compressedSize).toBe(3_000_000)
     const calls = log.entries.filter((e) => e.startsWith('start:0:')).length
     expect(calls).toBeLessThanOrEqual(2)
+  })
+})
+
+describe('Overshoot fix: refinement converges on hard curves', () => {
+  // Curve measured from real Ghostscript on a 53MB scan-like PDF
+  // (piecewise power law: steep in the middle, shallow near 300 DPI)
+  const measuredCurve = (dpi: number): number => {
+    if (dpi <= 150) return Math.round(1_950_000 * Math.pow(dpi / 150, 2.75))
+    if (dpi <= 200) return Math.round(1_950_000 * Math.pow(dpi / 150, 2.89))
+    return Math.round(4_480_000 * Math.pow(dpi / 200, 0.415))
+  }
+
+  it('lands within the good-enough band instead of collapsing to the low probe', async () => {
+    const behaviors = new Map<number, FileBehavior>([
+      [50_000_000, { sizeForDpi: measuredCurve }],
+    ])
+    const { log } = await installMockWorkers(behaviors)
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'scan.pdf', buffer: new ArrayBuffer(50_000_000) }],
+      SIZE_TARGET
+    )
+
+    // Best achievable near 4MB exists (DPI ~195). Collapsing to the
+    // 72 DPI probe (0.26MB) wastes 93% of the allowed size budget.
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].compressedSize).toBeGreaterThanOrEqual(3_600_000)
+    expect(results[0].compressedSize).toBeLessThanOrEqual(4_000_000)
+
+    // Bounded work: probes + refinements stay within 10 Ghostscript calls
+    const calls = log.entries.filter((e) => e.startsWith('start:0:')).length
+    expect(calls).toBeLessThanOrEqual(10)
+  })
+
+  it('keeps refining after a failed probe instead of giving up', async () => {
+    // High-DPI passes fail (e.g. resource limits); everything under 100 DPI works
+    const behaviors = new Map<number, FileBehavior>([
+      [10_000_000, {
+        sizeForDpi: (dpi) => dpi * 10_000,
+        failAboveDpi: 99,
+      }],
+    ])
+    await installMockWorkers(behaviors)
+    const { CompressionController } = await import('../src/compression/controller')
+    const controller = new CompressionController()
+
+    const results = await controller.compressFiles(
+      [{ name: 'fragile.pdf', buffer: new ArrayBuffer(10_000_000) }],
+      SIZE_TARGET
+    )
+
+    // Old behavior: first failed refinement probe aborted the loop,
+    // returning the 72 DPI result (720KB). The search should push toward
+    // the best working DPI just under 100 (roughly 950KB or better).
+    expect(results[0].metTarget).toBe(true)
+    expect(results[0].compressedSize).toBeGreaterThanOrEqual(900_000)
   })
 })
 

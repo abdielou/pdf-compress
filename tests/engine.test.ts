@@ -79,3 +79,19 @@ describe('compressAtDpi', () => {
     expect(gs.FS.unlink).toHaveBeenCalledWith('/output.pdf')
   })
 })
+
+describe('Ghostscript args: deterministic size-vs-DPI', () => {
+  it('disables AutoFilter and forces DCT so size tracks DPI monotonically', () => {
+    const gs = createMockGs(() => 5000)
+    const input = new Uint8Array(10000)
+    gs.FS.writeFile('/input.pdf', input)
+
+    compressAtDpi(gs, 150)
+
+    const args = gs.callMain.mock.calls[0][0] as string[]
+    expect(args).toContain('-dAutoFilterColorImages=false')
+    expect(args).toContain('-dAutoFilterGrayImages=false')
+    expect(args).toContain('-dColorImageFilter=/DCTEncode')
+    expect(args).toContain('-dGrayImageFilter=/DCTEncode')
+  })
+})

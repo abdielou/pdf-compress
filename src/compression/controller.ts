@@ -10,7 +10,11 @@ const LOW_PROBE_DPI = 72
 const MIN_DPI = 30
 const MIN_WORKERS = 2  // Need at least 2 for parallel probes
 const GOOD_ENOUGH_RATIO = 0.90  // Stop if result is within 90% of target
-const MAX_REFINEMENTS = 3
+const MAX_REFINEMENTS = 8
+// Power-law interpolation is fast on well-behaved curves but overshoots
+// repeatedly when the curve's local exponent varies; after this many
+// attempts the loop switches to plain bisection for guaranteed progress
+const INTERPOLATION_TRIES = 2
 
 function getPoolSize(): number {
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2
@@ -319,14 +323,24 @@ export class CompressionController {
     let highSize = highProbe?.size ?? originalSize
 
     for (let r = 0; r < MAX_REFINEMENTS; r++) {
-      const estimatedDpi = interpolateDpi(lowDpi, lowSize, highDpi, highSize, targetBytes)
+      let estimatedDpi = r < INTERPOLATION_TRIES
+        ? interpolateDpi(lowDpi, lowSize, highDpi, highSize, targetBytes)
+        : Math.round((lowDpi + highDpi) / 2)
 
-      // Avoid re-testing a DPI we've already tried
-      if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) break
+      // Stay strictly inside the bracket; bisect when interpolation leaves it
+      if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) {
+        estimatedDpi = Math.round((lowDpi + highDpi) / 2)
+        if (estimatedDpi <= lowDpi || estimatedDpi >= highDpi) break
+      }
 
       const probe = await compressAtDpi(worker, fileIndex, file.buffer, estimatedDpi)
       report(probe, estimatedDpi)
-      if (!probe) break
+      if (!probe) {
+        // Failed pass (e.g. resource limits at high DPI): search lower
+        // instead of giving up on the whole refinement
+        highDpi = estimatedDpi
+        continue
+      }
 
       // Good enough — within 90% of target
       if (probe.size <= targetBytes && probe.size >= targetBytes * GOOD_ENOUGH_RATIO) {
