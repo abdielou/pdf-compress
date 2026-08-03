@@ -86,6 +86,8 @@ export function initApp(root: HTMLElement): void {
       case 'compressing':
         compressBtn.disabled = true
         compressBtn.textContent = 'Compressing...'
+        // A new run owns the screen: drop the previous run's results
+        resultsSection.innerHTML = ''
         break
       case 'done':
         compressBtn.style.display = 'none'
@@ -160,22 +162,14 @@ export function initApp(root: HTMLElement): void {
     }
 
     const target = targetConfig.getTarget()
-    const totalFiles = selectedFiles.length
 
-    // Show status right away: the first Ghostscript pass can take a while
-    // and the first progress event only fires when it completes
-    progressUI.showFileProgress(0, totalFiles, selectedFiles[0].name)
-    let lastFileIndex = 0
+    // Per-file rows appear immediately: files compress concurrently across
+    // the worker pool and each row tracks its own file
+    progressUI.startRun(selectedFiles.map((f) => f.name))
 
     try {
       const results = await compressFiles(selectedFiles, target, (fileIndex, iteration, dpi, size) => {
-        // PRG-01: Only call showFileProgress when fileIndex changes
-        if (fileIndex !== lastFileIndex) {
-          progressUI.showFileProgress(fileIndex, totalFiles, selectedFiles[fileIndex].name)
-          lastFileIndex = fileIndex
-        }
-        // PRG-02: Update progress bar per iteration
-        progressUI.updateIteration(iteration, dpi, size)
+        progressUI.updateIteration(fileIndex, iteration, dpi, size)
       })
 
       // Process results

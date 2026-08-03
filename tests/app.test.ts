@@ -158,7 +158,51 @@ describe('App Orchestrator', () => {
 
     const status = root.querySelector('.progress-status')
     expect(status?.textContent?.toLowerCase()).toContain('compressing')
-    expect(status?.textContent).toContain('slow.pdf')
+    // The file appears as its own progress row
+    expect(root.querySelector('.progress-files')?.textContent).toContain('slow.pdf')
+
+    document.body.removeChild(root)
+    vi.resetModules()
+  })
+
+  it('starting a new run clears the previous run results', async () => {
+    const { controller, compressFiles } = await import('../src/main')
+    const mockController = controller as { isReady: boolean }
+    mockController.isReady = true
+
+    ;(compressFiles as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        fileIndex: 0,
+        fileName: 'first.pdf',
+        originalSize: 5_000_000,
+        compressedSize: 3_000_000,
+        buffer: new ArrayBuffer(8),
+        skipped: false,
+        metTarget: true,
+      },
+    ])
+
+    const { initApp } = await import('../src/ui/app')
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    initApp(root)
+
+    const { createDropZone } = await import('../src/ui/drop-zone')
+    const onFilesCb = (createDropZone as ReturnType<typeof vi.fn>).mock.calls[0][1] as (files: File[]) => void
+    const pdfFile = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'first.pdf', { type: 'application/pdf' })
+
+    // First run completes and shows a result
+    onFilesCb([pdfFile])
+    ;(root.querySelector('.compress-btn') as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(root.textContent).toContain('2.9 MB')
+
+    // Second run starts: old results must be gone while compressing
+    ;(compressFiles as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}))
+    onFilesCb([pdfFile])
+    ;(root.querySelector('.compress-btn') as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(root.textContent).not.toContain('2.9 MB')
 
     document.body.removeChild(root)
     vi.resetModules()

@@ -1,6 +1,9 @@
+import { formatSize } from './results'
+
 export interface ProgressUI {
-  showFileProgress(fileIndex: number, totalFiles: number, fileName: string): void
-  updateIteration(iteration: number, dpi: number, size: number): void
+  /** Begin a run: one row per file, all queued. */
+  startRun(fileNames: string[]): void
+  updateIteration(fileIndex: number, iteration: number, dpi: number, size: number): void
   showFileComplete(fileIndex: number): void
   showFileError(fileIndex: number, fileName: string, message: string): void
   showLoading(message: string): void
@@ -8,12 +11,7 @@ export interface ProgressUI {
   reset(): void
 }
 
-function formatSize(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
 export function createProgressUI(container: HTMLElement): ProgressUI {
-  // Build DOM structure
   const progressContainer = document.createElement('div')
   progressContainer.className = 'progress-container'
 
@@ -28,9 +26,6 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
   fillEl.style.width = '0%'
   barEl.appendChild(fillEl)
 
-  const iterEl = document.createElement('small')
-  iterEl.className = 'progress-iteration'
-
   const filesEl = document.createElement('div')
   filesEl.className = 'progress-files'
 
@@ -40,45 +35,73 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
 
   progressContainer.appendChild(statusEl)
   progressContainer.appendChild(barEl)
-  progressContainer.appendChild(iterEl)
   progressContainer.appendChild(filesEl)
   progressContainer.appendChild(loadingEl)
 
   container.appendChild(progressContainer)
 
-  function showFileProgress(fileIndex: number, totalFiles: number, fileName: string): void {
-    statusEl.textContent = `Compressing ${fileIndex + 1}/${totalFiles}... ${fileName}`
-    // Disable transition briefly so the reset to 0 is instant, not animated backwards
+  let names: string[] = []
+  let rows: HTMLElement[] = []
+  let total = 0
+  let completed = 0
+
+  function setRow(row: HTMLElement, state: 'queued' | 'active' | 'success' | 'error', text: string): void {
+    row.className = `progress-file-row progress-file-row--${state}`
+    row.textContent = text
+  }
+
+  function fileDone(): void {
+    completed++
+    if (total > 0) {
+      fillEl.style.width = `${Math.min(100, Math.round((completed / total) * 100))}%`
+    }
+    if (completed >= total && total > 0) {
+      statusEl.textContent = 'Done'
+    }
+  }
+
+  function startRun(fileNames: string[]): void {
+    names = [...fileNames]
+    total = names.length
+    completed = 0
+    statusEl.textContent = `Compressing ${total} file${total !== 1 ? 's' : ''}...`
     fillEl.style.transition = 'none'
     fillEl.style.width = '0%'
-    // Re-enable transition on next frame
     requestAnimationFrame(() => {
       fillEl.style.transition = ''
     })
-    iterEl.textContent = ''
+    filesEl.textContent = ''
+    rows = names.map((name) => {
+      const row = document.createElement('div')
+      setRow(row, 'queued', `${name}: queued`)
+      filesEl.appendChild(row)
+      return row
+    })
   }
 
-  function updateIteration(iteration: number, dpi: number, size: number): void {
-    iterEl.textContent = `Attempt ${iteration} at ${dpi} DPI (${formatSize(size)})`
-    // Move forward only — never let the bar go backwards
-    const next = Math.min(90, (iteration / 5) * 100)
-    const current = parseFloat(fillEl.style.width) || 0
-    fillEl.style.width = `${Math.max(current, next)}%`
+  function updateIteration(fileIndex: number, iteration: number, dpi: number, size: number): void {
+    const row = rows[fileIndex]
+    if (!row) return
+    setRow(row, 'active', `${names[fileIndex]}: attempt ${iteration} at ${dpi} DPI (${formatSize(size)})`)
   }
 
   function showFileComplete(fileIndex: number): void {
-    fillEl.style.width = '100%'
-    const row = document.createElement('div')
-    row.className = 'progress-file-row progress-file-row--success'
-    row.textContent = `\u2713 File ${fileIndex + 1} complete`
-    filesEl.appendChild(row)
+    const row = rows[fileIndex]
+    if (row) setRow(row, 'success', `✓ ${names[fileIndex]}`)
+    fileDone()
   }
 
   function showFileError(fileIndex: number, fileName: string, message: string): void {
-    const row = document.createElement('div')
-    row.className = 'progress-file-row progress-file-row--error'
-    row.textContent = `${fileName}: ${message}`
-    filesEl.appendChild(row)
+    const row = rows[fileIndex]
+    if (row) {
+      setRow(row, 'error', `${names[fileIndex]}: ${message}`)
+      fileDone()
+      return
+    }
+    // No matching row (e.g. engine-level failure before a run starts)
+    const orphan = document.createElement('div')
+    setRow(orphan, 'error', `${fileName}: ${message}`)
+    filesEl.appendChild(orphan)
   }
 
   function showLoading(message: string): void {
@@ -93,14 +116,17 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
   function reset(): void {
     statusEl.textContent = ''
     fillEl.style.width = '0%'
-    iterEl.textContent = ''
     filesEl.textContent = ''
+    names = []
+    rows = []
+    total = 0
+    completed = 0
     loadingEl.style.display = 'none'
     loadingEl.textContent = ''
   }
 
   return {
-    showFileProgress,
+    startRun,
     updateIteration,
     showFileComplete,
     showFileError,

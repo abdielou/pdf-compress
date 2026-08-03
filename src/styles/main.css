@@ -323,6 +323,14 @@ h1 small {
   color: var(--muted-foreground);
 }
 
+.progress-file-row--queued {
+  opacity: 0.6;
+}
+
+.progress-file-row--active {
+  color: var(--foreground);
+}
+
 .progress-file-row--error {
   color: var(--destructive);
 }
