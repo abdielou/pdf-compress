@@ -5,3 +5,4 @@ test-results/
 .claude/
 *.pdf
 compress.sh
+.playwright-mcp/
