@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
-import { renderResults, formatSize, buildZipEntries } from '../src/ui/results'
+import { renderZipButton, formatSize, buildZipEntries } from '../src/ui/results'
 import type { CompressionResult } from '../src/compression/types'
 
 function makeResult(overrides: Partial<CompressionResult>): CompressionResult {
@@ -56,45 +56,45 @@ describe('Fix 7b: ZIP entries deduplicate file names', () => {
   })
 })
 
-describe('Fix 7c: failure is signaled by the error field', () => {
-  it('renders a failed row when error is set', () => {
+describe('renderZipButton', () => {
+  it('renders a ZIP button when more than one file is downloadable', () => {
     const container = document.createElement('div')
-    renderResults(container, [
-      makeResult({ error: 'gs failed', compressedSize: 0, buffer: new ArrayBuffer(0), metTarget: false }),
+    renderZipButton(container, [
+      makeResult({ fileIndex: 0, fileName: 'a.pdf' }),
+      makeResult({ fileIndex: 1, fileName: 'b.pdf' }),
     ])
-    expect(container.textContent).toContain('Compression failed')
-    expect(container.querySelector('.results__download-btn')).toBeNull()
+    const btn = container.querySelector('.results__zip-btn')
+    expect(btn).not.toBeNull()
+    expect(btn!.textContent).toContain('2 files')
   })
 
-  it('renders a normal row with download when there is no error', () => {
+  it('renders nothing for a single downloadable file', () => {
     const container = document.createElement('div')
-    renderResults(container, [makeResult({})])
-    expect(container.textContent).not.toContain('Compression failed')
-    expect(container.querySelector('.results__download-btn')).not.toBeNull()
+    renderZipButton(container, [makeResult({})])
+    expect(container.querySelector('.results__zip-btn')).toBeNull()
   })
-})
 
-describe('Lossless label', () => {
-  it('marks lossless results', () => {
+  it('excludes failed files from the ZIP count', () => {
     const container = document.createElement('div')
-    renderResults(container, [makeResult({ lossless: true })])
-    expect(container.textContent).toContain('(lossless)')
-  })
-})
-
-describe('Fix 3 UI: unreachable target shows a warning but stays downloadable', () => {
-  it('shows a target warning when metTarget is false', () => {
-    const container = document.createElement('div')
-    renderResults(container, [
-      makeResult({ metTarget: false, compressedSize: 2_000_000 }),
+    renderZipButton(container, [
+      makeResult({ fileIndex: 0, fileName: 'a.pdf' }),
+      makeResult({ fileIndex: 1, fileName: 'b.pdf' }),
+      makeResult({
+        fileIndex: 2,
+        fileName: 'bad.pdf',
+        error: 'gs failed',
+        compressedSize: 0,
+        buffer: new ArrayBuffer(0),
+        metTarget: false,
+      }),
     ])
-    expect(container.textContent?.toLowerCase()).toContain('target')
-    expect(container.querySelector('.results__download-btn')).not.toBeNull()
+    expect(container.querySelector('.results__zip-btn')!.textContent).toContain('2 files')
   })
 
-  it('shows no warning when the target was met', () => {
+  it('clears previously rendered content', () => {
     const container = document.createElement('div')
-    renderResults(container, [makeResult({ metTarget: true })])
-    expect(container.querySelector('.results__sizes--warning')).toBeNull()
+    container.innerHTML = '<p>old</p>'
+    renderZipButton(container, [makeResult({})])
+    expect(container.textContent).not.toContain('old')
   })
 })

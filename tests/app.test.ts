@@ -165,6 +165,51 @@ describe('App Orchestrator', () => {
     vi.resetModules()
   })
 
+  it('a completed run shows each file exactly once (single unified list)', async () => {
+    const { controller, compressFiles } = await import('../src/main')
+    const mockController = controller as { isReady: boolean }
+    mockController.isReady = true
+
+    ;(compressFiles as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        fileIndex: 0,
+        fileName: 'only.pdf',
+        originalSize: 5_000_000,
+        compressedSize: 2_000_000,
+        buffer: new ArrayBuffer(8),
+        skipped: false,
+        metTarget: true,
+      },
+    ])
+
+    const { initApp } = await import('../src/ui/app')
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    initApp(root)
+
+    const { createDropZone } = await import('../src/ui/drop-zone')
+    const onFilesCb = (createDropZone as ReturnType<typeof vi.fn>).mock.calls[0][1] as (files: File[]) => void
+    const pdfFile = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'only.pdf', { type: 'application/pdf' })
+
+    onFilesCb([pdfFile])
+    ;(root.querySelector('.compress-btn') as HTMLButtonElement).click()
+    await new Promise((r) => setTimeout(r, 20))
+
+    // The file name appears in exactly one row, which carries the result
+    const matches = root.textContent!.split('only.pdf').length - 1
+    // Once in the (hidden-after-done) selected-file list, once in the row
+    const rows = root.querySelectorAll('.progress-file-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].textContent).toContain('1.9 MB')
+    expect(rows[0].querySelector('button')).not.toBeNull()
+    expect(matches).toBeLessThanOrEqual(2)
+    // No separate results list rows
+    expect(root.querySelector('.results__row')).toBeNull()
+
+    document.body.removeChild(root)
+    vi.resetModules()
+  })
+
   it('starting a new run clears the previous run results', async () => {
     const { controller, compressFiles } = await import('../src/main')
     const mockController = controller as { isReady: boolean }

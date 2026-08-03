@@ -1,6 +1,85 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { createProgressUI } from '../src/ui/progress'
+import type { CompressionResult } from '../src/compression/types'
+
+function makeResult(overrides: Partial<CompressionResult>): CompressionResult {
+  return {
+    fileIndex: 0,
+    fileName: 'doc.pdf',
+    originalSize: 5_000_000,
+    compressedSize: 2_000_000,
+    buffer: new ArrayBuffer(8),
+    skipped: false,
+    metTarget: true,
+    ...overrides,
+  }
+}
+
+describe('ProgressUI: rows become result rows (single list)', () => {
+  it('showFileResult turns the row into sizes text with a download button', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+
+    ui.startRun(['doc.pdf'])
+    ui.updateIteration(0, 2, 150, 2_500_000)
+    ui.showFileResult(makeResult({}))
+
+    const rows = container.querySelectorAll('.progress-file-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].textContent).toContain('4.8 MB')
+    expect(rows[0].textContent).toContain('1.9 MB')
+    expect(rows[0].textContent).toContain('% smaller')
+    expect(rows[0].querySelector('button')).not.toBeNull()
+    // Completion also fills the bar
+    expect((container.querySelector('.progress-fill') as HTMLElement).style.width).toBe('100%')
+  })
+
+  it('marks lossless results in the row', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['doc.pdf'])
+    ui.showFileResult(makeResult({ lossless: true }))
+    expect(container.querySelector('.progress-file-row')!.textContent).toContain('(lossless)')
+  })
+
+  it('skipped files show already-under-target and stay downloadable', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['small.pdf'])
+    ui.showFileResult(makeResult({ fileName: 'small.pdf', skipped: true, compressedSize: 5_000_000 }))
+    const row = container.querySelector('.progress-file-row')!
+    expect(row.textContent).toContain('already under target')
+    expect(row.querySelector('button')).not.toBeNull()
+  })
+
+  it('unreachable target shows a warning but keeps the download button', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['doc.pdf'])
+    ui.showFileResult(makeResult({ metTarget: false }))
+    const row = container.querySelector('.progress-file-row')!
+    expect(row.textContent?.toLowerCase()).toContain('target')
+    expect(row.querySelector('button')).not.toBeNull()
+  })
+
+  it('error results show the failure and no download button', () => {
+    const container = document.createElement('div')
+    const ui = createProgressUI(container)
+    ui.startRun(['bad.pdf'])
+    ui.showFileResult(makeResult({
+      fileName: 'bad.pdf',
+      error: 'gs failed',
+      compressedSize: 0,
+      buffer: new ArrayBuffer(0),
+      metTarget: false,
+    }))
+    const row = container.querySelector('.progress-file-row')!
+    expect(row.className).toContain('error')
+    expect(row.textContent).toContain('Compression failed')
+    expect(row.querySelector('button')).toBeNull()
+  })
+})
 
 describe('ProgressUI: per-file rows', () => {
   it('startRun renders overall status and one queued row per file', () => {

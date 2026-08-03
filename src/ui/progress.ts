@@ -1,10 +1,13 @@
-import { formatSize } from './results'
+import { formatSize, downloadResult } from './results'
+import type { CompressionResult } from '../compression/types'
 
 export interface ProgressUI {
   /** Begin a run: one row per file, all queued. */
   startRun(fileNames: string[]): void
   updateIteration(fileIndex: number, iteration: number, dpi: number, size: number): void
   showFileComplete(fileIndex: number): void
+  /** Turn the file's row into its final result (sizes, download). */
+  showFileResult(result: CompressionResult): void
   showFileError(fileIndex: number, fileName: string, message: string): void
   showLoading(message: string): void
   hideLoading(): void
@@ -110,6 +113,46 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     fileDone(fileIndex)
   }
 
+  function showFileResult(result: CompressionResult): void {
+    const row = rows[result.fileIndex]
+    if (!row) return
+
+    const state = result.error ? 'error' : 'success'
+    row.className = `progress-file-row progress-file-row--${state}`
+    row.textContent = ''
+
+    const info = document.createElement('span')
+    info.className = 'progress-file-row__info'
+
+    if (result.error) {
+      info.textContent = `${result.fileName}: Compression failed: ${result.error}`
+    } else if (result.skipped) {
+      info.textContent = `${result.fileName}: ${formatSize(result.originalSize)} (already under target)`
+    } else {
+      const saved = Math.round((1 - result.compressedSize / result.originalSize) * 100)
+      let text = `${result.fileName}: ${formatSize(result.originalSize)} → ` +
+        `${formatSize(result.compressedSize)} (${saved}% smaller)`
+      if (result.lossless) text += ' (lossless)'
+      if (!result.metTarget) {
+        text += ' (could not reach target, smallest possible shown)'
+        row.classList.add('progress-file-row--warning')
+      }
+      info.textContent = text
+    }
+    row.appendChild(info)
+
+    if (!result.error && result.compressedSize > 0) {
+      const downloadBtn = document.createElement('button')
+      downloadBtn.className = 'results__download-btn'
+      downloadBtn.textContent = 'Download'
+      downloadBtn.type = 'button'
+      downloadBtn.addEventListener('click', () => downloadResult(result))
+      row.appendChild(downloadBtn)
+    }
+
+    fileDone(result.fileIndex)
+  }
+
   function showFileError(fileIndex: number, fileName: string, message: string): void {
     const row = rows[fileIndex]
     if (row) {
@@ -149,6 +192,7 @@ export function createProgressUI(container: HTMLElement): ProgressUI {
     startRun,
     updateIteration,
     showFileComplete,
+    showFileResult,
     showFileError,
     showLoading,
     hideLoading,

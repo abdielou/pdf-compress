@@ -25,7 +25,7 @@ export function buildZipEntries(results: CompressionResult[]): Record<string, Ui
   return entries
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -34,83 +34,29 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export function renderResults(container: HTMLElement, results: CompressionResult[]): void {
+export function downloadResult(result: CompressionResult): void {
+  const blob = new Blob([result.buffer], { type: 'application/pdf' })
+  downloadBlob(blob, `${outputName(result.fileName)}.pdf`)
+}
+
+/**
+ * Render the download-all-as-ZIP button (only when more than one file is
+ * downloadable). Per-file rows live in the progress list.
+ */
+export function renderZipButton(container: HTMLElement, results: CompressionResult[]): void {
   container.innerHTML = ''
 
-  const section = document.createElement('div')
-  section.className = 'results'
-
-  // Per-file rows
-  for (const r of results) {
-    const row = document.createElement('div')
-    row.className = 'results__row'
-
-    const info = document.createElement('div')
-    info.className = 'results__info'
-
-    const name = document.createElement('span')
-    name.className = 'results__name'
-    name.textContent = r.fileName
-    name.title = r.fileName
-
-    const sizes = document.createElement('span')
-    sizes.className = 'results__sizes'
-
-    if (r.skipped) {
-      sizes.textContent = `${formatSize(r.originalSize)} (already under target)`
-      sizes.classList.add('results__sizes--skipped')
-    } else if (r.error) {
-      sizes.textContent = `Compression failed: ${r.error}`
-      sizes.classList.add('results__sizes--error')
-    } else {
-      const saved = Math.round((1 - r.compressedSize / r.originalSize) * 100)
-      sizes.textContent = `${formatSize(r.originalSize)} → ${formatSize(r.compressedSize)} (${saved}% smaller)`
-      if (r.lossless) {
-        sizes.textContent += ' (lossless)'
-      }
-      if (!r.metTarget) {
-        sizes.textContent += ' (could not reach target, smallest possible shown)'
-        sizes.classList.add('results__sizes--warning')
-      }
-    }
-
-    info.appendChild(name)
-    info.appendChild(sizes)
-
-    const actions = document.createElement('div')
-    actions.className = 'results__actions'
-
-    if (!r.error && r.compressedSize > 0) {
-      const downloadBtn = document.createElement('button')
-      downloadBtn.className = 'results__download-btn'
-      downloadBtn.textContent = 'Download'
-      downloadBtn.type = 'button'
-      downloadBtn.addEventListener('click', () => {
-        const blob = new Blob([r.buffer], { type: 'application/pdf' })
-        downloadBlob(blob, `${outputName(r.fileName)}.pdf`)
-      })
-      actions.appendChild(downloadBtn)
-    }
-
-    row.appendChild(info)
-    row.appendChild(actions)
-    section.appendChild(row)
-  }
-
-  // Download all as ZIP (only if > 1 file with valid output)
   const downloadable = results.filter((r) => !r.error && r.compressedSize > 0)
-  if (downloadable.length > 1) {
-    const zipBtn = document.createElement('button')
-    zipBtn.className = 'results__zip-btn'
-    zipBtn.textContent = `Download all as ZIP (${downloadable.length} files)`
-    zipBtn.type = 'button'
-    zipBtn.addEventListener('click', () => {
-      const zipped = zipSync(buildZipEntries(downloadable))
-      const blob = new Blob([new Uint8Array(zipped)], { type: 'application/zip' })
-      downloadBlob(blob, 'compressed_pdfs.zip')
-    })
-    section.appendChild(zipBtn)
-  }
+  if (downloadable.length <= 1) return
 
-  container.appendChild(section)
+  const zipBtn = document.createElement('button')
+  zipBtn.className = 'results__zip-btn'
+  zipBtn.textContent = `Download all as ZIP (${downloadable.length} files)`
+  zipBtn.type = 'button'
+  zipBtn.addEventListener('click', () => {
+    const zipped = zipSync(buildZipEntries(downloadable))
+    const blob = new Blob([new Uint8Array(zipped)], { type: 'application/zip' })
+    downloadBlob(blob, 'compressed_pdfs.zip')
+  })
+  container.appendChild(zipBtn)
 }

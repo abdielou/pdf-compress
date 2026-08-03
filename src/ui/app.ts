@@ -1,7 +1,7 @@
 import { createDropZone } from './drop-zone'
 import { createTargetConfig } from './target-config'
 import { createProgressUI } from './progress'
-import { renderResults } from './results'
+import { renderZipButton } from './results'
 import { compressFiles, controller } from '../main'
 import type { CompressionResult } from '../compression/types'
 
@@ -172,18 +172,13 @@ export function initApp(root: HTMLElement): void {
         progressUI.updateIteration(fileIndex, iteration, dpi, size)
       })
 
-      // Process results
+      // Each file's row becomes its result (sizes, download, or error)
       for (const result of results) {
-        if (result.error && !result.skipped) {
-          // PRG-04: Per-file error
-          progressUI.showFileError(result.fileIndex, result.fileName, 'Compression failed')
-        } else {
-          progressUI.showFileComplete(result.fileIndex)
-        }
+        progressUI.showFileResult(result)
       }
 
       lastResults = results
-      renderResults(resultsSection, results)
+      renderZipButton(resultsSection, results)
       setState('done')
     } catch (err) {
       // Unexpected error — show as generic message but don't crash

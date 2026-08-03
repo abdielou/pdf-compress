@@ -317,10 +317,23 @@ h1 small {
 }
 
 .progress-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 6px 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
   color: var(--muted-foreground);
+}
+
+.progress-file-row__info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.progress-file-row--warning .progress-file-row__info {
+  color: #b45309;
 }
 
 .progress-file-row--queued {
